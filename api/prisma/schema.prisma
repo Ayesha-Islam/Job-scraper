@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+  output = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+enum ScrapeStatus {
+  SUCCESS
+  FAILED
+}
+
+model Job {
+  id          String   @id @default(uuid())
+  company     String
+  position    String
+  location    String?
+  salary      String?
+  type        JobType  @default(FULL_TIME)
+  url         String   @unique
+  source      String
+  description String?  @db.Text
+  hash        String   @unique
+  isActive    Boolean  @default(true)
+  scrapedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([company])
+  @@index([location])
+  @@index([type])
+  @@index([source])
+  @@index([hash])
+  @@index([createdAt])
+  @@index([isActive])
+}
+
+model ScrapeLog {
+  id           String       @id @default(uuid())
+  source       String
+  status       ScrapeStatus
+  jobsFound    Int
+  jobsAdded    Int
+  errorMessage String?      @db.Text
+  durationMs   Int
+  completedAt  DateTime     @default(now())
+
+  @@index([source])
+  @@index([status])
+  @@index([completedAt])
+}
