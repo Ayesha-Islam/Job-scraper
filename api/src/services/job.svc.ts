@@ -3,6 +3,7 @@ import { CacheService } from '../cache';
 import { JobFilters, PaginatedResponse } from '../types';
 import { createHash } from 'crypto';
 import type { Prisma, Job as PrismaJob, JobType as PrismaJobType } from '@prisma/client'
+import chalk from 'chalk';
 
 export type JobType = PrismaJobType
 export type Job = PrismaJob
@@ -116,36 +117,53 @@ export class JobService {
                     .update(`${job.url.toLowerCase()}:${job.position.toLowerCase()}`)
                     .digest('hex');
 
-                const existing = await this.container.db.job.findUnique({
-                    where: { hash },
-                });
+                const result = await this.container.db.job.upsert({
+                    where: { url: job.url },
+                    update: {
+                        position: job.position,
+                        company: job.company,
+                        location: job.location,
+                        salary: job.salary,
+                        type: job.type,
+                        description: job.description,
+                        hash: hash,
+                        isActive: true,
+                        scrapedAt: new Date(),
+                        updatedAt: new Date(),
+                    },
+                    create: {
+                        company: job.company,
+                        position: job.position,
+                        location: job.location,
+                        salary: job.salary,
+                        type: job.type,
+                        url: job.url,
+                        source: job.source,
+                        description: job.description,
+                        hash: hash,
+                        isActive: true,
+                        scrapedAt: new Date(),
+                    }
+                })
 
-                if (existing) {
-                    await this.container.db.job.update({
-                        where: { hash },
-                        data: {
-                            isActive: true,
-                            scrapedAt: new Date(),
-                            updatedAt: new Date(),
-                        },
-                    });
-                    duplicates++;
-                } else {
-                    await this.container.db.job.create({
-                        data: {
-                            ...job,
-                            hash,
-                            isActive: true,
-                            scrapedAt: new Date(),
-                        },
-                    });
+                const timeDiff = Math.abs(
+                    result.updatedAt.getTime() - result.createdAt.getTime()
+                );
+
+                if (timeDiff < 1000) {
                     added++;
+                    console.log(chalk.green(`   ✓ Added: ${job.position} at ${job.company}`));
+                } else {
+                    duplicates++;
+                    console.log(chalk.yellow(`   ⚠️  Duplicate: ${job.position} at ${job.company}`));
                 }
             } catch (error) {
-                console.error('Failed to save job:', error);
+                console.error(`   ❌ Failed to save job: ${job.position} at ${job.company}`, error);
+                duplicates++;
             }
         }
 
+        console.log(chalk.cyan(`\n📊 Save Summary: ${added} added, ${duplicates} duplicates`));
         return { added, duplicates };
     }
 

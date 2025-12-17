@@ -1,9 +1,7 @@
 import { BaseScraper, ScraperConfig } from './base';
 import { Container } from '../container';
 import { Job, JobType } from '../types';
-import * as cheerio from 'cheerio';
 import chalk from 'chalk';
-import type { Element } from 'domhandler'
 
 
 export class WWRScraper extends BaseScraper {
@@ -25,143 +23,114 @@ export class WWRScraper extends BaseScraper {
 
     try {
       console.log(chalk.cyan('🔍 Navigating to WeWorkRemotely...'));
+
       await this.navigateTo(this.config.url);
       await this.randomDelay(2000, 3000);
 
-      const jobsExist = await this.waitForSelector('li.feature, section.jobs', 10000);
-
-      if (!jobsExist) {
-        console.log(chalk.yellow('⚠️  No jobs found'));
-        await this.screenshot('wwr-debug.png');
-        return [];
+      const hasJobs = await this.waitForSelector('li.feature, section.jobs', 10000);
+      if (!hasJobs) {
+        throw new Error('Job listings not found');
       }
 
       console.log(chalk.green('✓ Found job listings'));
 
-      const html = await this.page.content();
-      const $ = cheerio.load(html);
+      const jobsData = await this.page.evaluate(() => {
+        const results: any[] = [];
 
-      console.log(chalk.gray('\n🔍 Debug Info:'));
-      console.log(chalk.gray(`  li.feature: ${$('li.feature').length}`));
-      console.log(chalk.gray(`  section.jobs li: ${$('section.jobs li').length}`));
-      console.log(chalk.gray(`  Elements with .title: ${$('.title').length}`));
-      console.log(chalk.gray(`  Elements with .company: ${$('.company').length}`));
+        const jobElements = document.querySelectorAll('li.feature, section.jobs li');
 
-      $('li.feature').each((index, element) => {
-        const job = this.parseJobElement($, element, 'featured');
-        if (job) {
-          jobs.push(job);
-          this.displayJob(job, jobs.length);
-        }
-      });
+        console.log(`
+🔍 Debug Info:
+  li.feature: ${document.querySelectorAll('li.feature').length}
+  section.jobs li: ${document.querySelectorAll('section.jobs li').length}
+  span.company: ${document.querySelectorAll('span.company').length}
+  Elements with href: ${document.querySelectorAll('li a[href*="/remote-jobs/"]').length}
+        `);
 
-      $('section.jobs li').each((index, element) => {
-        const $el = $(element);
+        jobElements.forEach((element) => {
+          try {
+            const linkEl = element.querySelector('a[href*="/remote-jobs/"], a[href*="/company/"]');
+            if (!linkEl) return;
 
-        if ($el.hasClass('feature') || $el.hasClass('ad')) return;
 
-        const job = this.parseJobElement($, element, 'regular');
-        if (job) {
-          jobs.push(job);
-          this.displayJob(job, jobs.length);
-        }
-      });
+            let company = '';
 
-      if (jobs.length === 0) {
-        console.log(chalk.yellow('\n⚠️  No jobs from li elements, trying article elements...'));
+            const linkText = linkEl.textContent || '';
+            const linkTitle = (linkEl as HTMLAnchorElement).title || '';
 
-        $('article').each((index, element) => {
-          const job = this.parseJobElement($, element, 'article');
-          if (job) {
-            jobs.push(job);
-            this.displayJob(job, jobs.length);
+            const href = (linkEl as HTMLAnchorElement).href;
+            const urlMatch = href.match(/\/company\/([\w-]+)/);
+            if (urlMatch) {
+              company = urlMatch[1]
+                .split('-')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            }
+
+            const companyEl = element.querySelector('span.company, .company-name, [class*="company"]');
+            if (companyEl && companyEl.textContent?.trim()) {
+              company = companyEl.textContent.trim();
+            }
+
+            const atMatch = linkText.match(/at\s+(.+?)(?:\s*\||$)/i);
+            if (atMatch) {
+              company = atMatch[1].trim();
+            }
+
+            const position = linkEl.textContent?.trim() || '';
+
+            const regionEl = element.querySelector('.region, [class*="location"]');
+            const location = regionEl?.textContent?.trim() || 'Anywhere';
+
+            const url = href;
+
+            const tagsEl = element.querySelector('.tags');
+            const tags = tagsEl?.textContent?.trim() || '';
+
+            if (position && url) {
+              results.push({
+                position,
+                company: company || 'Remote Company', // Better fallback
+                location,
+                url,
+                tags,
+              });
+            }
+          } catch (err) {
+            console.error('Error parsing WWR job:', err);
           }
         });
+
+        return results;
+      });
+
+      console.log(chalk.cyan(`📋 Extracted ${jobsData.length} jobs from page`));
+
+      for (const data of jobsData) {
+        if (!data.position || data.position.length < 3) {
+          console.log(chalk.gray(`  ↳ Skipping: No valid position title (${data.url})`));
+          continue;
+        }
+
+        const job: Job = {
+          company: this.cleanText(data.company),
+          position: this.cleanText(data.position),
+          location: data.location || 'Remote',
+          salary: null,
+          type: this.parseJobType(data.tags),
+          url: data.url,
+          source: 'WeWorkRemotely',
+        };
+
+        jobs.push(job);
       }
 
-      if (jobs.length === 0) {
-        console.log(chalk.yellow('\n⚠️  Trying generic parsing...'));
-
-        $('.title').each((index, element) => {
-          const $parent = $(element).closest('li, article, div');
-          const parentNode = $parent.get(0);
-          if (!parentNode || (parentNode as any).type !== 'tag') return;
-          const job = this.parseJobElement($, parentNode as Element, 'generic');
-          if (job) {
-            jobs.push(job);
-            this.displayJob(job, jobs.length);
-          }
-        });
-      }
-
-      if (jobs.length === 0) {
-        console.log(chalk.yellow('\n⚠️  No jobs extracted. Taking screenshot...'));
-        await this.screenshot('wwr-debug.png');
-      }
-
-      console.log(chalk.green(`\n✨ WeWorkRemotely scraping complete: ${jobs.length} jobs extracted`));
+      console.log(chalk.green(`✨ WeWorkRemotely scraping complete: ${jobs.length} jobs extracted`));
       return jobs;
 
     } catch (error) {
-      console.error(chalk.red(`❌ WeWorkRemotely scrape failed: ${error}`));
-      throw error;
+      throw new Error(`WeWorkRemotely scraping failed: ${error}`);
     }
-  }
-
-  private parseJobElement($: cheerio.CheerioAPI, element: Element, source: string): Job | null {
-    try {
-      const $el = $(element);
-
-      const position = $el.find('.title').first().text().trim() ||
-        $el.find('h2').first().text().trim() ||
-        $el.find('h3').first().text().trim() ||
-        $el.find('.job-title').first().text().trim() ||
-        $el.find('span.title').first().text().trim() ||
-        '';
-
-      const company = $el.find('.company').first().text().trim() ||
-        $el.find('span.company').first().text().trim() ||
-        $el.find('.company-name').first().text().trim() ||
-        $el.find('h4').first().text().trim() ||
-        '';
-
-      const region = $el.find('.region').first().text().trim() ||
-        $el.find('.location').first().text().trim() ||
-        'Anywhere';
-
-      const href = $el.find('a').first().attr('href') || '';
-      const url = href ? (href.startsWith('http') ? href : `https://weworkremotely.com${href}`) : '';
-
-      if (!position || position.length < 3) {
-        return null;
-      }
-
-      const finalCompany = company || 'Unknown Company';
-
-      if (!url || url === 'https://weworkremotely.com') {
-        return null;
-      }
-
-      return {
-        company: this.cleanText(finalCompany),
-        position: this.cleanText(position),
-        location: this.cleanText(region),
-        salary: null,
-        type: JobType.FULL_TIME,
-        url,
-        source: 'WeWorkRemotely',
-      };
-
-    } catch (error) {
-      return null;
-    }
-  }
-
-  private displayJob(job: Job, index: number): void {
-    console.log(chalk.cyan(`\n  ${index}. ${chalk.bold(job.position)}`));
-    console.log(chalk.white(`     Company: ${job.company}`));
-    console.log(chalk.gray(`     Location: ${job.location}`));
-    console.log(chalk.blue(`     URL: ${job.url.substring(0, 60)}...`));
   }
 
   isRemoteUS(job: Job): boolean {
