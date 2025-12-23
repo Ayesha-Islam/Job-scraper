@@ -96,3 +96,14 @@ api/prisma/*.db-journal
 *.swp
 *.swo
 *~
+
+#Frontend folder 
+Frontend/build/
+Frontend/node_modules/
+Frontend/package-lock.json
+Frontend/package.json
+Frontend/tsconfig.json
+Frontend/.env
+Frontend/.env.*
+Frontend/.env.local
+Frontend/.env.development.local

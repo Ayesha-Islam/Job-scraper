@@ -1,4 +1,3 @@
-
 import { Request, Response, NextFunction } from 'express';
 import { JobService } from './services/job.svc';
 import { JobType } from './types';

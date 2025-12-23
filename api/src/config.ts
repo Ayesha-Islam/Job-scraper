@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import { Pool } from 'pg'
 dotenv.config()
 
 export interface Env {
@@ -21,7 +22,7 @@ const missing = (k: string) => {
 
 export const env: Env = {
   NODE_ENV: (process.env.NODE_ENV as Env['NODE_ENV']) ?? 'development',
-  PORT: process.env.PORT ?? '3000',
+  PORT: process.env.PORT ?? '3001',
   DATABASE_URL: process.env.DATABASE_URL ?? missing('DATABASE_URL'),
   REDIS_HOST: process.env.REDIS_HOST ?? 'localhost',
   REDIS_PORT: process.env.REDIS_PORT ?? '6379',
@@ -32,3 +33,17 @@ export const env: Env = {
   ALERT_EMAIL: process.env.ALERT_EMAIL,
   FROM_EMAIL: process.env.FROM_EMAIL
 }
+
+export const pool = new Pool({
+  connectionString: env.DATABASE_URL,
+  ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+pool.on('connect', () => {
+  console.log('Database connected successfully');
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});

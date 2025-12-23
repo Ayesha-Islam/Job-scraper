@@ -7,6 +7,7 @@ import { CacheService } from './cache';
 import { JobService } from './services/job.svc';
 import { JobController, HealthController, AdminController } from './controllers';
 import { createRoutes } from './routes';
+import { createAuthRoutes } from './routes/auth.routes';
 
 export function createApp() {
   const app = express();
@@ -19,10 +20,18 @@ export function createApp() {
   const adminController = new AdminController(container, jobService);
 
   app.use(helmet());
-  app.use(cors());
+  app.use(cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
   app.use(compression());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+
+  const authRoutes = createAuthRoutes();
+  app.use('/api/v1/auth', authRoutes);
 
   if (container.env.NODE_ENV === 'development') {
     app.use((req, res, next) => {

@@ -26,22 +26,18 @@ export class RemotiveScraper extends BaseScraper {
       await this.navigateTo(this.config.url);
       await this.randomDelay(2000, 3000);
 
-      // ✅ FIX: Use correct selectors for Remotive's HTML structure
       const jobsExist = await this.waitForSelector('article.job-tile, .job-list-item, [class*="job"]', 10000);
 
       if (!jobsExist) {
         console.log(chalk.yellow('⚠️  No jobs found with standard selectors, trying alternative...'));
 
-        // Try scrolling to load content
         await this.autoScroll(3, 1000);
         await this.sleep(2000);
       }
 
-      // Extract jobs using page evaluation
       const jobsData = await this.page.evaluate(() => {
         const results: any[] = [];
 
-        // Try multiple possible selectors
         const selectors = [
           'article.job-tile',
           '.job-list-item',
@@ -66,7 +62,6 @@ export class RemotiveScraper extends BaseScraper {
 
         jobElements.forEach((element) => {
           try {
-            // Extract job details
             const titleEl = element.querySelector('[class*="title"], h2, h3, .job-title');
             const companyEl = element.querySelector('[class*="company"], .company-name');
             const locationEl = element.querySelector('[class*="location"], .location');
@@ -106,7 +101,6 @@ export class RemotiveScraper extends BaseScraper {
 
       console.log(chalk.cyan(`📋 Extracted ${jobsData.length} jobs from page`));
 
-      // Convert to Job objects
       for (const data of jobsData) {
         const job: Job = {
           company: this.cleanText(data.company),
@@ -150,7 +144,6 @@ export class RemotiveScraper extends BaseScraper {
       location.includes('north america') ||
       location.includes('americas');
 
-    // Exclude region-specific postings that don't allow US applicants
     const excludedRegions = [
       'europe only',
       'eu only',
