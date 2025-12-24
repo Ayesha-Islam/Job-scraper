@@ -27,7 +27,7 @@ export class LinkedInScraper extends BaseScraper {
       await this.randomDelay(3000, 5000);
 
       const jobsExist = await this.waitForSelector('ul.jobs-search__results-list', 10000);
-      
+
       if (!jobsExist) {
         console.log(chalk.yellow('⚠️  No job listings found'));
         await this.screenshot('linkedin-debug.png');
@@ -49,39 +49,39 @@ export class LinkedInScraper extends BaseScraper {
       if (jobCards.length === 0) {
         console.log(chalk.yellow('⚠️  No job cards found in HTML'));
         await this.screenshot('linkedin-no-cards.png');
-        
+
         // Debug: show what we found
         console.log(chalk.gray('\n🔍 Debug Info:'));
         console.log(chalk.gray(`  .job-search-card: ${$('.job-search-card').length}`));
         console.log(chalk.gray(`  .base-card: ${$('.base-card').length}`));
         console.log(chalk.gray(`  [data-job-id]: ${$('[data-job-id]').length}`));
-        
+
         return [];
       }
 
       const limit = Math.min(jobCards.length, 20);
-      
+
       jobCards.slice(0, limit).each((index, element) => {
         try {
           const $card = $(element);
-          
+
           let position = $card.find('.base-search-card__title').text().trim() ||
-                        $card.find('.job-card-list__title').text().trim() ||
-                        $card.find('h3').first().text().trim() ||
-                        $card.find('[class*="title"]').first().text().trim();
+            $card.find('.job-card-list__title').text().trim() ||
+            $card.find('h3').first().text().trim() ||
+            $card.find('[class*="title"]').first().text().trim();
 
           let company = $card.find('.base-search-card__subtitle').text().trim() ||
-                       $card.find('.job-card-container__company-name').text().trim() ||
-                       $card.find('h4').first().text().trim() ||
-                       $card.find('[class*="company"]').first().text().trim();
+            $card.find('.job-card-container__company-name').text().trim() ||
+            $card.find('h4').first().text().trim() ||
+            $card.find('[class*="company"]').first().text().trim();
 
           let location = $card.find('.job-search-card__location').text().trim() ||
-                        $card.find('.job-card-container__metadata-item').text().trim() ||
-                        $card.find('[class*="location"]').first().text().trim() ||
-                        'Remote - USA';
+            $card.find('.job-card-container__metadata-item').text().trim() ||
+            $card.find('[class*="location"]').first().text().trim() ||
+            'Remote - USA';
 
           let url = $card.find('a').first().attr('href') || '';
-          
+
           if (url.includes('?')) {
             url = url.split('?')[0];
           }
@@ -124,7 +124,7 @@ export class LinkedInScraper extends BaseScraper {
       });
 
       console.log(chalk.green(`\n✨ LinkedIn scraping complete: ${jobs.length} jobs extracted`));
-      
+
       if (jobs.length === 0) {
         console.log(chalk.yellow('\n⚠️  No jobs extracted. Saving HTML for debugging...'));
         await this.screenshot('linkedin-final.png');
@@ -142,20 +142,20 @@ export class LinkedInScraper extends BaseScraper {
   isRemoteUS(job: Job): boolean {
     const location = job.location?.toLowerCase() || '';
     const position = job.position.toLowerCase();
-    
-    const isRemote = 
+
+    const isRemote =
       location.includes('remote') ||
       position.includes('remote') ||
       location.includes('anywhere') ||
       location.includes('work from home');
 
-    const isUS = 
+    const isUS =
       location.includes('united states') ||
       location.includes('usa') ||
       location.includes('u.s.') ||
       /\b(california|new york|texas|florida|washington|illinois|massachusetts|virginia|colorado|oregon|pennsylvania)\b/i.test(location);
 
-    const excluded = 
+    const excluded =
       location.includes('europe only') ||
       location.includes('asia only');
 

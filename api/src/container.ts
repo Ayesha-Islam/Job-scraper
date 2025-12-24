@@ -10,16 +10,17 @@ export class Container {
   public readonly env: Env;
   public readonly db: PrismaClient;
   public readonly redis: IORedis;
+  public readonly pool: Pool;
 
   private constructor() {
     this.env = env;
 
     console.log('🔄 Initializing Prisma...');
-    const pool = new Pool({
+    this.pool = new Pool({
       connectionString: env.DATABASE_URL,
     });
 
-    const adapter = new PrismaPg(pool);
+    const adapter = new PrismaPg(this.pool);
 
     this.db = new PrismaClient({
       adapter,
