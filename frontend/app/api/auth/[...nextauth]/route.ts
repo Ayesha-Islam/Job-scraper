@@ -29,7 +29,6 @@ const handler = NextAuth({
             id: responseData.data.id,
             name: responseData.data.name,
             email: responseData.data.email,
-            // You can also store a JWT from the backend here if you have one
             token: responseData.data.token 
           };
         }
