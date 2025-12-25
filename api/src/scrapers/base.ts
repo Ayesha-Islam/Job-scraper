@@ -1,6 +1,6 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
 import { Container } from '../container';
-import { Job, ScrapeResult, JobType } from '../types';
+import { ScrapedJob, ScrapeResult, JobType } from '../types';
 import Anthropic from '@anthropic-ai/sdk';
 import { JobService } from '../services/job.svc';
 import { createHash } from 'crypto';
@@ -19,7 +19,7 @@ export abstract class BaseScraper {
   protected page: Page | null = null;
   protected retryCount = 0;
   protected anthropic: Anthropic | null = null;
-  protected lastJobs: Job[] = [];
+  protected lastJobs: ScrapedJob[] = [];
 
   constructor(
     protected container: Container,
@@ -32,10 +32,10 @@ export abstract class BaseScraper {
     }
   }
 
-  abstract scrapeJobs(): Promise<Job[]>;
-  abstract isRemoteUS(job: Job): boolean;
+  abstract scrapeJobs(): Promise<ScrapedJob[]>;
+  abstract isRemoteUS(job: ScrapedJob): boolean;
 
-  public getLastJobs(): Job[] {
+  public getLastJobs(): ScrapedJob[] {
     return this.lastJobs;
   }
 
@@ -43,7 +43,7 @@ export abstract class BaseScraper {
     this.lastJobs = [];
   }
 
-  protected computeHash(job: Job): string {
+  protected computeHash(job: ScrapedJob): string {
     const key = `${job.url.toLowerCase()}:${job.position.toLowerCase()}`;
     return createHash('md5').update(key).digest('hex');
   }
@@ -63,7 +63,6 @@ export abstract class BaseScraper {
       console.log(`🚀 Starting ${this.config.name} scraper...`);
       await this.initBrowser();
 
-      // Scrape jobs (with retries)
       const jobs = await this.scrapeWithRetry();
       this.lastJobs = jobs;
       result.jobsFound = jobs.length;
@@ -78,11 +77,11 @@ export abstract class BaseScraper {
           position: j.position,
           location: j.location ?? null,
           salary: j.salary ?? null,
-          type: j.type as JobType,
+          type: j.type,
           url: j.url,
           source: j.source,
           description: j.description ?? null,
-          hash: j.hash ?? this.computeHash(j),
+          hash: this.computeHash(j),
         }));
 
         console.log('💾 Saving jobs to database...');
@@ -171,7 +170,6 @@ export abstract class BaseScraper {
       );
 
       await this.page.setViewport({ width: 1920, height: 1080 });
-
       this.page.setDefaultTimeout(this.config.timeout);
 
       console.log(`✅ Browser initialized for ${this.config.name}`);
@@ -196,7 +194,7 @@ export abstract class BaseScraper {
         return;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        console.warn(`⚠️  Navigation attempt ${attempt + 1} failed: ${errorMsg}`);
+        console.warn(`⚠️ Navigation attempt ${attempt + 1} failed: ${errorMsg}`);
         if (attempt === maxRetries - 1) {
           throw new Error(`Navigation failed after ${maxRetries} attempts: ${errorMsg}`);
         }
@@ -253,7 +251,7 @@ export abstract class BaseScraper {
 
   protected randomDelay(min = 1000, max = 3000): Promise<void> {
     const delay = Math.floor(Math.random() * (max - min + 1) + min);
-    console.log(`⏱️  Random delay: ${delay}ms`);
+    console.log(`⏱️ Random delay: ${delay}ms`);
     return this.sleep(delay);
   }
 
@@ -261,14 +259,14 @@ export abstract class BaseScraper {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  protected async scrapeWithRetry(): Promise<Job[]> {
+  protected async scrapeWithRetry(): Promise<ScrapedJob[]> {
     while (this.retryCount < this.config.maxRetries) {
       try {
         return await this.scrapeJobs();
       } catch (error) {
         this.retryCount++;
         const errorMsg = error instanceof Error ? error.message : 'Unknown';
-        console.warn(`⚠️  Scrape attempt ${this.retryCount}/${this.config.maxRetries} failed: ${errorMsg}`);
+        console.warn(`⚠️ Scrape attempt ${this.retryCount}/${this.config.maxRetries} failed: ${errorMsg}`);
         if (this.retryCount >= this.config.maxRetries) {
           throw new Error(`Max retries exceeded: ${errorMsg}`);
         }

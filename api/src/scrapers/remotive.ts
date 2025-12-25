@@ -1,6 +1,6 @@
 import { BaseScraper, ScraperConfig } from './base';
 import { Container } from '../container';
-import { Job } from '../types';
+import { ScrapedJob } from '../types';
 import chalk from 'chalk';
 
 export class RemotiveScraper extends BaseScraper {
@@ -15,10 +15,10 @@ export class RemotiveScraper extends BaseScraper {
     super(container, config);
   }
 
-  async scrapeJobs(): Promise<Job[]> {
+  async scrapeJobs(): Promise<ScrapedJob[]> {
     if (!this.page) throw new Error('Page not initialized');
 
-    const jobs: Job[] = [];
+    const jobs: ScrapedJob[] = [];
 
     try {
       console.log(chalk.cyan('🔍 Fetching from Remotive...'));
@@ -29,8 +29,7 @@ export class RemotiveScraper extends BaseScraper {
       const jobsExist = await this.waitForSelector('article.job-tile, .job-list-item, [class*="job"]', 10000);
 
       if (!jobsExist) {
-        console.log(chalk.yellow('⚠️  No jobs found with standard selectors, trying alternative...'));
-
+        console.log(chalk.yellow('⚠️ No jobs found with standard selectors, trying alternative...'));
         await this.autoScroll(3, 1000);
         await this.sleep(2000);
       }
@@ -102,21 +101,23 @@ export class RemotiveScraper extends BaseScraper {
       console.log(chalk.cyan(`📋 Extracted ${jobsData.length} jobs from page`));
 
       for (const data of jobsData) {
-        const job: Job = {
+        // Fixed: Create ScrapedJob with all required fields
+        const job: ScrapedJob = {
           company: this.cleanText(data.company),
           position: this.cleanText(data.position),
           location: data.location || 'Remote - Worldwide',
-          salary: data.salary,
+          salary: data.salary || null,
           type: this.parseJobType(data.tags),
           url: data.url,
           source: 'Remotive',
+          description: null,
         };
 
         jobs.push(job);
       }
 
       if (jobs.length === 0) {
-        console.log(chalk.yellow('⚠️  No jobs found. Taking screenshot for debugging...'));
+        console.log(chalk.yellow('⚠️ No jobs found. Taking screenshot for debugging...'));
         await this.page.screenshot({ path: 'remotive-debug.png', fullPage: true });
         console.log(chalk.blue('📸 Screenshot saved: remotive-debug.png'));
       }
@@ -130,7 +131,7 @@ export class RemotiveScraper extends BaseScraper {
     }
   }
 
-  isRemoteUS(job: Job): boolean {
+  isRemoteUS(job: ScrapedJob): boolean {
     const location = job.location?.toLowerCase() || '';
 
     const isUSOrWorldwide =
@@ -158,5 +159,4 @@ export class RemotiveScraper extends BaseScraper {
 
     return isUSOrWorldwide && !isExcluded;
   }
-
 }

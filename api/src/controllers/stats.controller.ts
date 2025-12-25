@@ -7,8 +7,8 @@ export class StatsController {
 
   async getStats(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      console.log(chalk.cyan('📊 Fetching statistics...'));
-
+      console.log(chalk.cyan('📊 Fetching stats'));
+      
       const stats = await this.jobService.getStats();
 
       res.json({
@@ -20,28 +20,6 @@ export class StatsController {
       });
     } catch (error) {
       console.error(chalk.red('❌ Error fetching stats:'), error);
-      next(error);
-    }
-  }
-
-  async getSourceStats(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      console.log(chalk.cyan('📊 Fetching source statistics...'));
-
-      const stats = await this.jobService.getStats();
-
-      res.json({
-        success: true,
-        data: {
-          sources: stats.bySource,
-          total: stats.total,
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
-    } catch (error) {
-      console.error(chalk.red('❌ Error fetching source stats:'), error);
       next(error);
     }
   }

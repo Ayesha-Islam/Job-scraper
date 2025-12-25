@@ -1,8 +1,7 @@
 import { BaseScraper, ScraperConfig } from './base';
 import { Container } from '../container';
-import { Job, JobType } from '../types';
+import { ScrapedJob, JobType } from '../types';
 import chalk from 'chalk';
-
 
 export class WWRScraper extends BaseScraper {
   constructor(container: Container) {
@@ -16,10 +15,10 @@ export class WWRScraper extends BaseScraper {
     super(container, config);
   }
 
-  async scrapeJobs(): Promise<Job[]> {
+  async scrapeJobs(): Promise<ScrapedJob[]> {
     if (!this.page) throw new Error('Page not initialized');
 
-    const jobs: Job[] = [];
+    const jobs: ScrapedJob[] = [];
 
     try {
       console.log(chalk.cyan('🔍 Navigating to WeWorkRemotely...'));
@@ -51,7 +50,6 @@ export class WWRScraper extends BaseScraper {
           try {
             const linkEl = element.querySelector('a[href*="/remote-jobs/"], a[href*="/company/"]');
             if (!linkEl) return;
-
 
             let company = '';
 
@@ -90,7 +88,7 @@ export class WWRScraper extends BaseScraper {
             if (position && url) {
               results.push({
                 position,
-                company: company || 'Remote Company', // Better fallback
+                company: company || 'Remote Company',
                 location,
                 url,
                 tags,
@@ -112,7 +110,8 @@ export class WWRScraper extends BaseScraper {
           continue;
         }
 
-        const job: Job = {
+        // Fixed: Create ScrapedJob with all required fields
+        const job: ScrapedJob = {
           company: this.cleanText(data.company),
           position: this.cleanText(data.position),
           location: data.location || 'Remote',
@@ -120,6 +119,7 @@ export class WWRScraper extends BaseScraper {
           type: this.parseJobType(data.tags),
           url: data.url,
           source: 'WeWorkRemotely',
+          description: null,
         };
 
         jobs.push(job);
@@ -133,7 +133,7 @@ export class WWRScraper extends BaseScraper {
     }
   }
 
-  isRemoteUS(job: Job): boolean {
+  isRemoteUS(job: ScrapedJob): boolean {
     const location = job.location?.toLowerCase() || '';
 
     const excluded = [

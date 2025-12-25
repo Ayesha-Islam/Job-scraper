@@ -1,5 +1,5 @@
 import { Container } from '../container';
-import { CacheService } from '../cache';
+import { CacheService } from '../cache/store';
 import { JobService } from '../services/job.svc';
 import { LinkedInScraper } from './linkedin';
 import { RemotiveScraper } from './remotive';
@@ -8,9 +8,6 @@ import { ScrapeResult } from '../types';
 import chalk from 'chalk';
 
 export class ScraperManager {
-  runOne(source: any) {
-    throw new Error('Method not implemented.');
-  }
   private scrapers: Array<LinkedInScraper | RemotiveScraper | WWRScraper>;
 
   constructor(
@@ -23,6 +20,43 @@ export class ScraperManager {
       new RemotiveScraper(container),
       new WWRScraper(container),
     ];
+  }
+
+  async runOne(sourceName: string): Promise<ScrapeResult> {
+    const scraper = this.scrapers.find(s => 
+      s['config'].name.toLowerCase() === sourceName.toLowerCase()
+    );
+
+    if (!scraper) {
+      throw new Error(`Scraper not found: ${sourceName}`);
+    }
+
+    console.log(chalk.blue(`\n🎯 Running ${scraper['config'].name} scraper...`));
+
+    try {
+      const result = await scraper.scrapeAndSave(this.jobService);
+      console.log(chalk.green(`✓ Completed: ${result.jobsAdded} new jobs, ${result.jobsDuplicate} duplicates`));
+      await this.logResult(result);
+      
+      console.log(chalk.cyan('\n🗑️ Invalidating caches...'));
+      await this.jobService.invalidateCaches();
+      console.log(chalk.green('✓ Caches cleared\n'));
+
+      return result;
+    } catch (error) {
+      console.error(chalk.red(`❌ Scraper failed: ${error}`));
+      const failedResult: ScrapeResult = {
+        source: scraper['config'].name,
+        jobsFound: 0,
+        jobsAdded: 0,
+        jobsDuplicate: 0,
+        duration: 0,
+        status: 'FAILED',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      await this.logResult(failedResult);
+      return failedResult;
+    }
   }
 
   async runAll(): Promise<ScrapeResult[]> {
@@ -67,7 +101,7 @@ export class ScraperManager {
     const totalDuration = Date.now() - startTime;
     this.printSummary(results, totalDuration);
 
-    console.log(chalk.cyan('\n🗑️  Invalidating caches...'));
+    console.log(chalk.cyan('\n🗑️ Invalidating caches...'));
     await this.jobService.invalidateCaches();
     console.log(chalk.green('✓ Caches cleared\n'));
 
@@ -122,12 +156,11 @@ export class ScraperManager {
     if (totalAdded > 0) {
       console.log(chalk.green.bold(`🎉 Successfully added ${totalAdded} new remote jobs to database!\n`));
     } else if (totalFound > 0) {
-      console.log(chalk.yellow(`ℹ️  Found ${totalFound} jobs but all were duplicates or filtered out\n`));
+      console.log(chalk.yellow(`ℹ️ Found ${totalFound} jobs but all were duplicates or filtered out\n`));
     } else {
-      console.log(chalk.red(`⚠️  No jobs found. Check website structure or selectors\n`));
+      console.log(chalk.red(`⚠️ No jobs found. Check website structure or selectors\n`));
     }
   }
-
 
   private async logResult(result: ScrapeResult): Promise<void> {
     try {

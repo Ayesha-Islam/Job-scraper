@@ -1,16 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { Container } from '../container';
-import { CacheService } from '../cache';
-import { JobService } from '../services/job.svc';
 import { ScraperManager } from '../scrapers/manager';
 import chalk from 'chalk';
+import { ApiResponse } from '../types';
 
 export class AdminController {
-  constructor(
-    private container: Container,
-    private cache: CacheService,
-    private jobService: JobService
-  ) {}
+  constructor(private container: Container) {}
 
   async triggerScrape(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -18,7 +13,12 @@ export class AdminController {
 
       console.log(chalk.blue('🚀 Manual scrape triggered...'));
 
-      const manager = new ScraperManager(this.container, this.cache, this.jobService);
+      // Fixed: Pass all required arguments (container, cache, jobService)
+      const manager = new ScraperManager(
+        this.container,
+        this.container.cache,
+        this.container.jobService
+      );
 
       let results;
       if (source) {
@@ -49,7 +49,6 @@ export class AdminController {
       next(error);
     }
   }
-
 
   async getScrapeLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -84,7 +83,6 @@ export class AdminController {
       next(error);
     }
   }
-
 
   async getScrapeStats(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -130,23 +128,22 @@ export class AdminController {
     }
   }
 
-
   async clearCache(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      console.log(chalk.cyan('🗑️  Clearing all caches...'));
+      console.log(chalk.cyan('🗑️ Clearing all caches...'));
+      await this.container.jobService.invalidateCaches();
 
-      await this.jobService.invalidateCaches();
-
-      res.json({
+      const response: ApiResponse = {
         success: true,
-        message: 'All caches cleared successfully',
-      });
+        data: { message: 'All caches cleared successfully' }
+      };
+
+      res.json(response);
     } catch (error) {
       console.error(chalk.red('❌ Error clearing cache:'), error);
       next(error);
     }
   }
-
 
   async getCacheStats(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

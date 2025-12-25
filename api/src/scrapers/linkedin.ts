@@ -1,6 +1,6 @@
 import { BaseScraper, ScraperConfig } from './base';
 import { Container } from '../container';
-import { Job, JobType } from '../types';
+import { ScrapedJob, JobType } from '../types';
 import * as cheerio from 'cheerio';
 import chalk from 'chalk';
 
@@ -16,10 +16,10 @@ export class LinkedInScraper extends BaseScraper {
     super(container, config);
   }
 
-  async scrapeJobs(): Promise<Job[]> {
+  async scrapeJobs(): Promise<ScrapedJob[]> {
     if (!this.page) throw new Error('Page not initialized');
 
-    const jobs: Job[] = [];
+    const jobs: ScrapedJob[] = [];
 
     try {
       console.log(chalk.cyan('🔍 Navigating to LinkedIn...'));
@@ -29,7 +29,7 @@ export class LinkedInScraper extends BaseScraper {
       const jobsExist = await this.waitForSelector('ul.jobs-search__results-list', 10000);
 
       if (!jobsExist) {
-        console.log(chalk.yellow('⚠️  No job listings found'));
+        console.log(chalk.yellow('⚠️ No job listings found'));
         await this.screenshot('linkedin-debug.png');
         return [];
       }
@@ -38,19 +38,16 @@ export class LinkedInScraper extends BaseScraper {
       console.log(chalk.cyan('📜 Scrolling to load more jobs...'));
       await this.autoScroll(3, 2000);
 
-      // ✅ FIX: Use Cheerio instead of page.evaluate
       const html = await this.page.content();
       const $ = cheerio.load(html);
 
-      // Count job cards
       const jobCards = $('.job-search-card, .jobs-search-results__list-item, .base-card, [data-job-id]');
       console.log(chalk.green(`📋 Found ${jobCards.length} job cards`));
 
       if (jobCards.length === 0) {
-        console.log(chalk.yellow('⚠️  No job cards found in HTML'));
+        console.log(chalk.yellow('⚠️ No job cards found in HTML'));
         await this.screenshot('linkedin-no-cards.png');
 
-        // Debug: show what we found
         console.log(chalk.gray('\n🔍 Debug Info:'));
         console.log(chalk.gray(`  .job-search-card: ${$('.job-search-card').length}`));
         console.log(chalk.gray(`  .base-card: ${$('.base-card').length}`));
@@ -96,7 +93,8 @@ export class LinkedInScraper extends BaseScraper {
             return;
           }
 
-          const job: Job = {
+          // Fixed: Create ScrapedJob instead of Job
+          const job: ScrapedJob = {
             company: this.cleanText(company),
             position: this.cleanText(position),
             location: this.cleanText(location),
@@ -104,7 +102,7 @@ export class LinkedInScraper extends BaseScraper {
             type: JobType.FULL_TIME,
             url: url || `https://linkedin.com/jobs/view/${Date.now()}-${index}`,
             source: 'LinkedIn',
-            description: undefined,
+            description: null, // Changed from undefined to null
           };
 
           jobs.push(job);
@@ -126,7 +124,7 @@ export class LinkedInScraper extends BaseScraper {
       console.log(chalk.green(`\n✨ LinkedIn scraping complete: ${jobs.length} jobs extracted`));
 
       if (jobs.length === 0) {
-        console.log(chalk.yellow('\n⚠️  No jobs extracted. Saving HTML for debugging...'));
+        console.log(chalk.yellow('\n⚠️ No jobs extracted. Saving HTML for debugging...'));
         await this.screenshot('linkedin-final.png');
       }
 
@@ -139,7 +137,7 @@ export class LinkedInScraper extends BaseScraper {
     }
   }
 
-  isRemoteUS(job: Job): boolean {
+  isRemoteUS(job: ScrapedJob): boolean {
     const location = job.location?.toLowerCase() || '';
     const position = job.position.toLowerCase();
 

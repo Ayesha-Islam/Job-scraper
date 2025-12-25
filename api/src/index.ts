@@ -1,33 +1,36 @@
-import { createApp } from './app';
-import { setupScheduler } from './scheduler';
+import app from './app';
+import container from './container';
+import chalk from 'chalk';
 
-async function bootstrap() {
-    const { app, container, cache, jobService } = createApp();
+const PORT = process.env.PORT || 3001;
 
-    setupScheduler(container, cache, jobService);
-
-    const PORT = container.env.PORT;
-    app.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
-        console.log(`📝 Environment: ${container.env.NODE_ENV}`);
+async function startServer() {
+  try {
+    console.log(chalk.cyan('🚀 Starting Job Scraper API...'));
+    console.log(chalk.gray(`   Environment: ${process.env.NODE_ENV || 'development'}`));
+    
+    await container.connect();
+    
+    const server = app.listen(PORT, () => {
+      console.log(chalk.green(`✓ Server running on port ${PORT}`));
+      console.log(chalk.cyan(`   http://localhost:${PORT}`));
+      console.log(chalk.cyan(`   Health: http://localhost:${PORT}/api/v1/health`));
+      console.log(chalk.cyan(`   Jobs: http://localhost:${PORT}/api/v1/jobs`));
     });
 
-    process.on('SIGTERM', async () => {
-        console.log('SIGTERM received');
-        cache.destroy();
-        await container.close();
-        process.exit(0);
+    server.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(chalk.red(`❌ Port ${PORT} is already in use`));
+      } else {
+        console.error(chalk.red('❌ Server error:'), error);
+      }
+      process.exit(1);
     });
 
-    process.on('SIGINT', async () => {
-        console.log('SIGINT received');
-        cache.destroy();
-        await container.close();
-        process.exit(0);
-    });
+  } catch (error) {
+    console.error(chalk.red('❌ Failed to start server:'), error);
+    process.exit(1);
+  }
 }
 
-bootstrap().catch((error) => {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-});
+startServer();

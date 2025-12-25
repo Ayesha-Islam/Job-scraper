@@ -1,59 +1,77 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import morgan from 'morgan';
 import compression from 'compression';
-import { Container } from './container';
-import { CacheService } from './cache';
-import { JobService } from './services/job.svc';
-import { createRoutes } from './routes';
+import container from './container';
 import chalk from 'chalk';
+import { createRoutes } from './routes';
 
-export function createApp() {
-  const app = express();
+const app: Express = express();
 
-  const container = Container.getInstance();
-  const cache = new CacheService(container);
-  const jobService = new JobService(container, cache);
-  const pool = container.pool;
+app.use(helmet());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+}));
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  app.use(helmet());
-  
-  app.use(cors({
-    origin: 'http://localhost:3000',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-  }));
-  
-  app.use(compression());
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
-
-  if (container.env.NODE_ENV === 'development') {
-    app.use((req, res, next) => {
-      console.log(chalk.gray(`${req.method} ${req.path}`));
-      next();
-    });
-  }
-
-  const routes = createRoutes(container, cache, jobService, pool);
-  app.use(routes);
-
-  app.use((req, res) => {
-    res.status(404).json({
-      success: false,
-      error: 'Route not found',
-      path: req.path,
-    });
-  });
-
-  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-    console.error(chalk.red('Error:'), err);
-    res.status(500).json({
-      success: false,
-      error: container.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
-    });
-  });
-
-  return { app, container, cache, jobService };
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
 }
+
+app.use(createRoutes(container));
+app.get('/', (req: Request, res: Response) => {
+  res.json({
+    name: 'Job Scraper API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/api/v1/health',
+      stats: '/api/v1/stats',
+      jobs: '/api/v1/jobs',
+      search: '/api/v1/jobs/search',
+    },
+  });
+});
+
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    error: 'Route not found',
+    path: req.path,
+  });
+});
+
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error(chalk.red('❌ Error:'), err);
+
+  const statusCode = err.statusCode || 500;
+  const message = err.message || 'Internal server error';
+
+  res.status(statusCode).json({
+    success: false,
+    error: message,
+    ...(process.env.NODE_ENV === 'development' && {
+      stack: err.stack,
+    }),
+  });
+});
+
+process.on('SIGTERM', async () => {
+  console.log(chalk.yellow('⚠️  SIGTERM received, shutting down gracefully...'));
+  await container.disconnect();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log(chalk.yellow('⚠️  SIGINT received, shutting down gracefully...'));
+  await container.disconnect();
+  process.exit(0);
+});
+
+export default app;

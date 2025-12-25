@@ -1,12 +1,9 @@
 import { Container } from '../container';
-import { CacheService } from '../cache';
-import { JobFilters, PaginatedResponse } from '../types';
+import { Job, JobType, JobFilters, PaginatedResponse, JobStats } from '../types'; 
 import { createHash } from 'crypto';
-import type { Prisma, Job as PrismaJob, JobType as PrismaJobType } from '@prisma/client'
+import type { Prisma } from '@prisma/client';
 import chalk from 'chalk';
-
-export type JobType = PrismaJobType
-export type Job = PrismaJob
+import { CacheService } from '../cache/store';
 
 export class JobService {
     constructor(
@@ -22,26 +19,58 @@ export class JobService {
         const cacheKey = this.cache.generateKey('jobs', { page, limit, ...filters });
 
         const cached = await this.cache.get<PaginatedResponse<Job>>(cacheKey);
-        if (cached) return cached;
+        if (cached) {
+            console.log(chalk.gray('   📦 Cache hit'));
+            return cached;
+        }
 
-        const where: any = { isActive: true };
-        if (filters.company) where.company = { contains: filters.company, mode: 'insensitive' };
-        if (filters.location) where.location = { contains: filters.location, mode: 'insensitive' };
-        if (filters.type) where.type = filters.type;
-        if (filters.source) where.source = filters.source;
+        const where: Prisma.JobWhereInput = { isActive: true };
+
+        if (filters.search?.trim()) {
+            const searchTerm = filters.search.trim();
+            where.OR = [
+                { position: { contains: searchTerm, mode: 'insensitive' } },
+                { company: { contains: searchTerm, mode: 'insensitive' } },
+                { description: { contains: searchTerm, mode: 'insensitive' } },
+                { location: { contains: searchTerm, mode: 'insensitive' } }
+            ];
+        }
+
+        if (filters.company?.trim()) {
+            where.company = { contains: filters.company.trim(), mode: 'insensitive' };
+        }
+
+        if (filters.location?.trim()) {
+            where.location = { contains: filters.location.trim(), mode: 'insensitive' };
+        }
+
+        if (filters.type) {
+            where.type = filters.type;
+        }
+
+        if (filters.source) {
+            where.source = filters.source;
+        }
+
+        const sortOptions: Record<string, Prisma.JobOrderByWithRelationInput> = {
+            recent: { createdAt: 'desc' },
+            oldest: { createdAt: 'asc' },
+            salary: { salary: 'desc' }
+        };
+        const orderBy = sortOptions[filters.sortBy || 'recent'] || sortOptions.recent;
 
         const [jobs, total] = await Promise.all([
             this.container.db.job.findMany({
                 where,
                 skip: (page - 1) * limit,
                 take: limit,
-                orderBy: { createdAt: 'desc' },
+                orderBy,
             }),
             this.container.db.job.count({ where }),
         ]);
 
         const result: PaginatedResponse<Job> = {
-            data: jobs,
+            data: jobs as Job[],
             pagination: {
                 page,
                 limit,
@@ -51,7 +80,6 @@ export class JobService {
         };
 
         await this.cache.set(cacheKey, result, 300);
-
         return result;
     }
 
@@ -66,20 +94,16 @@ export class JobService {
         });
 
         if (job) {
-            await this.cache.set(cacheKey, job, 600);
+            await this.cache.set(cacheKey, job as Job, 600);
         }
 
-        return job;
+        return job as Job | null;
     }
 
-    async getStats(): Promise<{
-        total: number;
-        bySource: { source: string; count: number; }[];
-        byType: { type: string; count: number; }[];
-    }> {
+    async getStats(): Promise<JobStats> {
         const cacheKey = this.cache.generateKey('stats', {});
 
-        const cached = await this.cache.get<{ total: number; bySource: { source: string; count: number; }[]; byType: { type: string; count: number; }[]; }>(cacheKey);
+        const cached = await this.cache.get<JobStats>(cacheKey);
         if (cached) return cached;
 
         const [total, bySource, byType] = await Promise.all([
@@ -96,14 +120,13 @@ export class JobService {
             }),
         ]);
 
-        const stats = {
+        const stats: JobStats = {
             total,
-            bySource: bySource.map((s: { source: any; _count: { source: any; }; }) => ({ source: s.source, count: s._count.source })),
-            byType: byType.map((t: { type: any; _count: { type: any; }; }) => ({ type: t.type, count: t._count.type })),
+            bySource: bySource.map(s => ({ source: s.source, count: s._count.source })),
+            byType: byType.map(t => ({ type: t.type, count: t._count.type })),
         };
 
         await this.cache.set(cacheKey, stats, 1800);
-
         return stats;
     }
 
@@ -132,38 +155,25 @@ export class JobService {
                         updatedAt: new Date(),
                     },
                     create: {
-                        company: job.company,
-                        position: job.position,
-                        location: job.location,
-                        salary: job.salary,
-                        type: job.type,
-                        url: job.url,
-                        source: job.source,
-                        description: job.description,
+                        ...job,
                         hash: hash,
                         isActive: true,
                         scrapedAt: new Date(),
                     }
-                })
+                });
 
-                const timeDiff = Math.abs(
-                    result.updatedAt.getTime() - result.createdAt.getTime()
-                );
-
-                if (timeDiff < 1000) {
+                const isNew = Math.abs(result.updatedAt.getTime() - result.createdAt.getTime()) < 1000;
+                if (isNew) {
                     added++;
-                    console.log(chalk.green(`   ✓ Added: ${job.position} at ${job.company}`));
                 } else {
                     duplicates++;
-                    console.log(chalk.yellow(`   ⚠️  Duplicate: ${job.position} at ${job.company}`));
                 }
             } catch (error) {
-                console.error(`   ❌ Failed to save job: ${job.position} at ${job.company}`, error);
+                console.error(`   ❌ Failed to save job: ${job.position}`, error);
                 duplicates++;
             }
         }
 
-        console.log(chalk.cyan(`\n📊 Save Summary: ${added} added, ${duplicates} duplicates`));
         return { added, duplicates };
     }
 

@@ -1,67 +1,79 @@
 import { Request, Response } from 'express';
 import chalk from 'chalk';
 import { Container } from '../container';
+import { ApiResponse, HealthCheckResponse } from '../types';
 
 export class HealthController {
   constructor(private container: Container) {}
 
   async check(req: Request, res: Response): Promise<void> {
     try {
-      await this.container.db.$queryRaw`SELECT 1`;
+      const healthStatus = await this.container.healthCheck();
       
-      await this.container.redis.ping();
-
-      res.json({
-        status: 'ok',
+      const healthData: HealthCheckResponse = {
+        status: (healthStatus.database && healthStatus.cache) ? 'healthy' : 'unhealthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        services: {
-          database: 'connected',
-          redis: 'connected',
+        database: {
+          status: healthStatus.database ? 'connected' : 'disconnected',
         },
-      });
+        cache: {
+          status: healthStatus.cache ? 'connected' : 'disconnected',
+        },
+      };
+
+      const response: ApiResponse<HealthCheckResponse> = {
+        success: true,
+        data: healthData
+      };
+
+      res.json(response);
     } catch (error) {
       console.error(chalk.red('❌ Health check failed:'), error);
       res.status(503).json({
-        status: 'error',
-        timestamp: new Date().toISOString(),
+        success: false,
         error: 'Service unavailable',
+        meta: { timestamp: new Date().toISOString() }
       });
     }
   }
-
 
   async checkDatabase(req: Request, res: Response): Promise<void> {
     try {
-      const result = await this.container.db.$queryRaw`SELECT 1 as health`;
+      await this.container.db.$queryRaw`SELECT 1`;
       res.json({
-        status: 'ok',
-        database: 'connected',
-        result,
+        success: true,
+        data: {
+          status: 'connected',
+          timestamp: new Date().toISOString()
+        }
       });
     } catch (error) {
+      console.error(chalk.red('❌ Database health check failed:'), error);
       res.status(503).json({
-        status: 'error',
-        database: 'disconnected',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
+        error: 'Database unavailable',
+        meta: { timestamp: new Date().toISOString() }
       });
     }
   }
 
-
   async checkRedis(req: Request, res: Response): Promise<void> {
     try {
-      const pong = await this.container.redis.ping();
+      await this.container.cache.ping();
       res.json({
-        status: 'ok',
-        redis: 'connected',
-        response: pong,
+        success: true,
+        data: {
+          status: 'connected',
+          timestamp: new Date().toISOString()
+        }
       });
     } catch (error) {
+      console.error(chalk.red('❌ Redis health check failed:'), error);
       res.status(503).json({
-        status: 'error',
-        redis: 'disconnected',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        success: false,
+        error: 'Redis unavailable',
+        meta: { timestamp: new Date().toISOString() }
       });
     }
   }

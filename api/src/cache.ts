@@ -1,103 +1,146 @@
-import { createHash } from 'crypto';
-import { Container } from './container';
+import Redis from 'ioredis';
+import chalk from 'chalk';
 
 export class CacheService {
-    private memoryCache = new Map<string, { data: any; expiry: number; }>();
-    private cleanupInterval: NodeJS.Timeout;
+  private client: Redis | null = null;
+  private isConnected: boolean = false;
 
-    constructor(private container: Container) {
-        this.cleanupInterval = setInterval(() => {
-            this.cleanupMemory();
-        }, 60000);
+  constructor() {
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    
+    try {
+      this.client = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        enableReadyCheck: true,
+        lazyConnect: true, 
+      });
+
+      this.client.on('error', (err) => {
+        console.error(chalk.red('❌ Redis error:'), err);
+        this.isConnected = false;
+      });
+
+      this.client.on('connect', () => {
+        console.log(chalk.green('✓ Redis connected'));
+        this.isConnected = true;
+      });
+
+      this.client.on('close', () => {
+        console.log(chalk.yellow('⚠️  Redis connection closed'));
+        this.isConnected = false;
+      });
+
+    } catch (error) {
+      console.error(chalk.red('❌ Redis initialization failed:'), error);
+      this.client = null;
+    }
+  }
+
+  async connect(): Promise<void> {
+    if (this.client && !this.isConnected) {
+      try {
+        await this.client.connect();
+      } catch (error) {
+        console.error(chalk.red('❌ Failed to connect to Redis:'), error);
+        throw error;
+      }
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.client && this.isConnected) {
+      await this.client.quit();
+    }
+  }
+
+  async ping(): Promise<string> {
+    if (!this.client || !this.isConnected) {
+      throw new Error('Redis not connected');
+    }
+    return await this.client.ping();
+  }
+
+  generateKey(prefix: string, params: Record<string, any>): string {
+    const sortedParams = Object.keys(params)
+      .sort()
+      .map(key => `${key}:${params[key]}`)
+      .join('|');
+    return `${prefix}:${sortedParams}`;
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    if (!this.client || !this.isConnected) {
+      return null;
     }
 
-    generateKey(prefix: string, params: Record<string, any> = {}): string {
-        const sorted = Object.keys(params)
-            .sort()
-            .reduce((acc, key) => {
-                acc[key] = params[key];
-                return acc;
-            }, {} as Record<string, any>);
+    try {
+      const data = await this.client.get(key);
+      if (!data) return null;
+      
+      return JSON.parse(data) as T;
+    } catch (error) {
+      console.error(chalk.red(`❌ Cache get error for key ${key}:`), error);
+      return null;
+    }
+  }
 
-        const hash = createHash('md5')
-            .update(JSON.stringify(sorted))
-            .digest('hex')
-            .slice(0, 16);
-
-        return `${prefix}:${hash}`;
+  async set(key: string, value: any, ttl: number = 300): Promise<void> {
+    if (!this.client || !this.isConnected) {
+      return;
     }
 
-    async get<T>(key: string): Promise<T | null> {
-        const mem = this.memoryCache.get(key);
-        if (mem && mem.expiry > Date.now()) {
-            console.log(`⚡ Memory HIT: ${key}`);
-            return mem.data as T;
-        }
+    try {
+      const serialized = JSON.stringify(value);
+      await this.client.setex(key, ttl, serialized);
+    } catch (error) {
+      console.error(chalk.red(`❌ Cache set error for key ${key}:`), error);
+    }
+  }
 
-        try {
-            const cached = await this.container.redis.get(key);
-            if (cached) {
-                console.log(`🎯 Redis HIT: ${key}`);
-                const data = JSON.parse(cached);
-                this.memoryCache.set(key, {
-                    data,
-                    expiry: Date.now() + 60000, // 1 min
-                });
-                return data as T;
-            }
-        } catch (error) {
-            console.error('Cache GET error:', error);
-        }
-
-        console.log(`❌ Cache MISS: ${key}`);
-        return null;
+  async delete(key: string): Promise<void> {
+    if (!this.client || !this.isConnected) {
+      return;
     }
 
-    async set(key: string, value: any, ttl: number = 300): Promise<void> {
-        try {
-            this.memoryCache.set(key, {
-                data: value,
-                expiry: Date.now() + Math.min(ttl, 60) * 1000,
-            });
+    try {
+      await this.client.del(key);
+    } catch (error) {
+      console.error(chalk.red(`❌ Cache delete error for key ${key}:`), error);
+    }
+  }
 
-            await this.container.redis.setex(key, ttl, JSON.stringify(value));
-            console.log(`💾 Cache SET: ${key} (TTL: ${ttl}s)`);
-        } catch (error) {
-            console.error('Cache SET error:', error);
-        }
+  async deletePattern(pattern: string): Promise<void> {
+    if (!this.client || !this.isConnected) {
+      return;
     }
 
-    async deletePattern(pattern: string): Promise<void> {
-        try {
-            const keys = await this.container.redis.keys(pattern);
-            if (keys.length > 0) {
-                await this.container.redis.del(...keys);
-                console.log(`🗑️  Deleted ${keys.length} keys matching: ${pattern}`);
-            }
-            this.memoryCache.clear();
-        } catch (error) {
-            console.error('Cache DELETE error:', error);
-        }
+    try {
+      const keys = await this.client.keys(pattern);
+      if (keys.length > 0) {
+        await this.client.del(...keys);
+        console.log(chalk.green(`✓ Deleted ${keys.length} keys matching ${pattern}`));
+      }
+    } catch (error) {
+      console.error(chalk.red(`❌ Cache deletePattern error for pattern ${pattern}:`), error);
+    }
+  }
+
+  async clear(): Promise<void> {
+    if (!this.client || !this.isConnected) {
+      return;
     }
 
-    private cleanupMemory(): void {
-        const now = Date.now();
-        let cleaned = 0;
-
-        for (const [key, value] of this.memoryCache.entries()) {
-            if (value.expiry <= now) {
-                this.memoryCache.delete(key);
-                cleaned++;
-            }
-        }
-
-        if (cleaned > 0) {
-            console.log(`🧹 Cleaned ${cleaned} expired memory cache entries`);
-        }
+    try {
+      await this.client.flushdb();
+      console.log(chalk.green('✓ Cache cleared'));
+    } catch (error) {
+      console.error(chalk.red('❌ Cache clear error:'), error);
     }
+  }
 
-    destroy(): void {
-        clearInterval(this.cleanupInterval);
-        this.memoryCache.clear();
-    }
+  isReady(): boolean {
+    return this.isConnected && this.client !== null;
+  }
 }
+
+export default CacheService;

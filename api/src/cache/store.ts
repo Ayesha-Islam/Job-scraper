@@ -1,68 +1,69 @@
-import { Container } from '../container';
 import { createHash } from 'crypto';
 
-export class CacheService {
-    private container: Container;
-    private memoryCache = new Map<string, { data: any; expiry: number; }>();
 
-    constructor(container: Container) {
-        this.container = container;
-        this.startCleanup();
+export class CacheService {
+    private memoryCache = new Map<string, { data: any; expiry: number; }>();
+    private cleanupInterval: NodeJS.Timeout;
+
+    constructor(private container: any) {
+        this.cleanupInterval = setInterval(() => this.cleanupMemory(), 60000);
     }
 
-    // Generate cache key
-    key(prefix: string, params: Record<string, any>): string {
+    async connect() { }
+    async disconnect() { this.destroy(); }
+    async ping() { return this.container.redis.ping(); }
+    generateKey(prefix: string, params: Record<string, any> = {}): string {
+        const sortedParams = Object.keys(params)
+            .sort()
+            .reduce((acc, key) => {
+                acc[key] = params[key];
+                return acc;
+            }, {} as Record<string, any>);
+
         const hash = createHash('md5')
-            .update(JSON.stringify(params))
-            .digest('hex');
+            .update(JSON.stringify(sortedParams))
+            .digest('hex')
+            .slice(0, 16);
+
         return `${prefix}:${hash}`;
     }
 
-    // Get from cache (memory first, then Redis)
     async get<T>(key: string): Promise<T | null> {
-        // L1: Memory
         const mem = this.memoryCache.get(key);
         if (mem && mem.expiry > Date.now()) {
-            console.log(`⚡ Memory HIT: ${key}`);
             return mem.data as T;
         }
 
-        // L2: Redis
         try {
             const cached = await this.container.redis.get(key);
             if (cached) {
-                console.log(`🎯 Redis HIT: ${key}`);
                 const data = JSON.parse(cached);
-                // Store in memory for fast access
-                this.memoryCache.set(key, { data, expiry: Date.now() + 60000 });
+                this.memoryCache.set(key, {
+                    data,
+                    expiry: Date.now() + 60000,
+                });
                 return data as T;
             }
         } catch (error) {
-            console.error('Cache GET error:', error);
+            console.error(`[Cache] Redis GET error for ${key}:`, error);
         }
 
-        console.log(`❌ Cache MISS: ${key}`);
         return null;
     }
 
-    // Set in cache (both layers)
-    async set(key: string, value: any, ttl = 300): Promise<void> {
+    async set(key: string, value: any, ttlSeconds: number = 300): Promise<void> {
         try {
-            // Memory cache (1 min)
             this.memoryCache.set(key, {
                 data: value,
-                expiry: Date.now() + Math.min(ttl, 60) * 1000,
+                expiry: Date.now() + Math.min(ttlSeconds, 60) * 1000,
             });
 
-            // Redis cache
-            await this.container.redis.setex(key, ttl, JSON.stringify(value));
-            console.log(`💾 Cache SET: ${key}`);
+            await this.container.redis.setex(key, ttlSeconds, JSON.stringify(value));
         } catch (error) {
-            console.error('Cache SET error:', error);
+            console.error(`[Cache] SET error for ${key}:`, error);
         }
     }
 
-    // Delete pattern
     async deletePattern(pattern: string): Promise<void> {
         try {
             const keys = await this.container.redis.keys(pattern);
@@ -71,19 +72,21 @@ export class CacheService {
             }
             this.memoryCache.clear();
         } catch (error) {
-            console.error('Cache DELETE error:', error);
+            console.error(`[Cache] DELETE error for pattern ${pattern}:`, error);
         }
     }
 
-    // Cleanup expired memory cache
-    private startCleanup() {
-        setInterval(() => {
-            const now = Date.now();
-            for (const [key, value] of this.memoryCache.entries()) {
-                if (value.expiry <= now) {
-                    this.memoryCache.delete(key);
-                }
+    private cleanupMemory(): void {
+        const now = Date.now();
+        for (const [key, value] of this.memoryCache.entries()) {
+            if (value.expiry <= now) {
+                this.memoryCache.delete(key);
             }
-        }, 60000); // Every minute
+        }
+    }
+
+    destroy(): void {
+        clearInterval(this.cleanupInterval);
+        this.memoryCache.clear();
     }
 }

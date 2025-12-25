@@ -1,34 +1,54 @@
 import { Request, Response, NextFunction } from 'express';
 import { JobService } from '../services/job.svc';
-import { JobType } from '../types';
+import { JobFilters, JobType, ApiResponse, PaginatedResponse, Job } from '../types';
 import chalk from 'chalk';
 
 export class JobController {
-  constructor(private jobService: JobService) {}
+  constructor(private jobService: JobService) { }
 
   async getJobs(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
-      
-      const filters = {
-        company: req.query.company as string,
-        location: req.query.location as string,
-        type: req.query.type as JobType,
-        source: req.query.source as string,
-      };
 
-      console.log(chalk.cyan(`📋 Fetching jobs: page=${page}, limit=${limit}`));
+      const filters: JobFilters = {};
+
+      if (req.query.search && typeof req.query.search === 'string') {
+        filters.search = req.query.search.trim();
+      }
+
+      if (req.query.company && typeof req.query.company === 'string') {
+        filters.company = req.query.company.trim();
+      }
+
+      if (req.query.location && typeof req.query.location === 'string') {
+        filters.location = req.query.location.trim();
+      }
+
+      if (req.query.type && req.query.type !== 'ALL') {
+        filters.type = req.query.type as JobType;
+      }
+
+      if (req.query.source && typeof req.query.source === 'string') {
+        filters.source = req.query.source;
+      }
+
+      const sortBy = req.query.sortBy as string;
+      filters.sortBy = (sortBy === 'recent' || sortBy === 'oldest' || sortBy === 'salary') 
+        ? sortBy 
+        : 'recent';
 
       const result = await this.jobService.getJobs(page, limit, filters);
 
-      res.json({
+      const response: ApiResponse<PaginatedResponse<Job>> = {
         success: true,
         data: result,
         meta: {
-          timestamp: new Date().toISOString(),
-        },
-      });
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      res.json(response);
     } catch (error) {
       console.error(chalk.red('❌ Error fetching jobs:'), error);
       next(error);
@@ -38,9 +58,6 @@ export class JobController {
   async getJobById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      
-      console.log(chalk.cyan(`🔍 Fetching job: ${id}`));
-
       const job = await this.jobService.getJobById(id);
 
       if (!job) {
@@ -51,10 +68,13 @@ export class JobController {
         return;
       }
 
-      res.json({
+      const response: ApiResponse<Job> = {
         success: true,
         data: job,
-      });
+        meta: { timestamp: new Date().toISOString() }
+      };
+
+      res.json(response);
     } catch (error) {
       console.error(chalk.red('❌ Error fetching job:'), error);
       next(error);
@@ -73,13 +93,9 @@ export class JobController {
         return;
       }
 
-      console.log(chalk.cyan(`🔍 Searching jobs: "${q}"`));
-
-      const filters = {
-        company: q,
-        location: undefined,
-        type: undefined,
-        source: undefined,
+      const filters: JobFilters = {
+        search: q.trim(),
+        sortBy: 'recent'
       };
 
       const result = await this.jobService.getJobs(
@@ -88,14 +104,16 @@ export class JobController {
         filters
       );
 
-      res.json({
+      const response: ApiResponse<PaginatedResponse<Job>> = {
         success: true,
         data: result,
         meta: {
           query: q,
           timestamp: new Date().toISOString(),
         },
-      });
+      };
+
+      res.json(response);
     } catch (error) {
       console.error(chalk.red('❌ Error searching jobs:'), error);
       next(error);
