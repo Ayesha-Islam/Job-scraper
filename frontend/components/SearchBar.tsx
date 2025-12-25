@@ -1,36 +1,45 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Search, X } from "lucide-react";
-import { debounce } from "@/lib/utils";
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
   placeholder?: string;
-  defaultValue?: string;
+  value?: string;
 }
 
 export default function SearchBar({
   onSearch,
   placeholder = "Search jobs by title, company, or keywords...",
-  defaultValue = "",
+  value = "",
 }: SearchBarProps) {
-  const [searchValue, setSearchValue] = useState(defaultValue);
+  const [searchValue, setSearchValue] = useState(value);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const debouncedSearch = debounce((value: string) => {
-      onSearch(value);
-    }, 500);
+    setSearchValue(value);
+  }, [value]);
 
-    if (searchValue !== defaultValue) {
-      debouncedSearch(searchValue);
+  useEffect(() => {
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
     }
-  }, [searchValue, onSearch, defaultValue]);
+
+    debounceTimer.current = setTimeout(() => {
+      onSearch(searchValue.trim());
+    }, 300);
+
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, [searchValue]);
 
   const handleClear = () => {
     setSearchValue("");
-    onSearch("");
   };
 
   return (

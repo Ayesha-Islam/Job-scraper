@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Job, JobFilters as JobFiltersType } from "@/types";
 import { getJobs } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Filter, X } from "lucide-react";
+import { Filter } from "lucide-react";
 import JobFilters from "@/components/JobFilters";
 import JobGrid from "@/components/JobGrid";
 import Pagination from "@/components/Pagination";
@@ -38,9 +38,9 @@ export default function JobsPage() {
       const response = await getJobs({
         page: currentPage,
         limit: 20,
-        search: filters.search,
-        type: filters.type,
-        location: filters.location,
+        search: filters.search || undefined,
+        type: filters.type !== "ALL" ? filters.type : undefined,
+        location: filters.location || undefined,
         sortBy: filters.sortBy,
       });
 
@@ -59,7 +59,7 @@ export default function JobsPage() {
 
   const handleSearch = (query: string) => {
     setFilters((prev) => ({ ...prev, search: query }));
-    setCurrentPage(1); 
+    setCurrentPage(1);
   };
 
   const handleFilterChange = (newFilters: JobFiltersType) => {
@@ -82,6 +82,11 @@ export default function JobsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const hasActiveFilters =
+    filters.type !== "ALL" || 
+    filters.location !== "" || 
+    filters.search !== "";
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200">
@@ -103,10 +108,10 @@ export default function JobsPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-5">
-          <SearchBar onSearch={handleSearch} defaultValue={filters.search} />
+          <SearchBar onSearch={handleSearch} value={filters.search} />
         </div>
 
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
           <p className="text-sm text-gray-600">
             {!isLoading && jobs.length > 0 && (
               <>
@@ -114,11 +119,23 @@ export default function JobsPage() {
               </>
             )}
           </p>
-          {filters.search && (
-            <p className="text-sm text-gray-600 hidden sm:block">
-              Search: <strong>"{filters.search}"</strong>
-            </p>
-          )}
+          <div className="flex items-center gap-3">
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearFilters}
+                className="text-sm text-gray-600 hover:text-gray-900"
+              >
+                Clear all filters
+              </Button>
+            )}
+            {filters.search && (
+              <p className="text-sm text-gray-600 hidden sm:block">
+                Search: <strong>"{filters.search}"</strong>
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="lg:hidden mb-4">
@@ -159,6 +176,19 @@ export default function JobsPage() {
                   size="sm"
                 >
                   Try Again
+                </Button>
+              </div>
+            )}
+
+            {!isLoading && jobs.length === 0 && !error && (
+              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                <p className="text-gray-600 mb-2">No jobs found matching your criteria</p>
+                <Button
+                  variant="outline"
+                  onClick={handleClearFilters}
+                  size="sm"
+                >
+                  Clear filters
                 </Button>
               </div>
             )}

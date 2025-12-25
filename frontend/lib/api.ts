@@ -34,7 +34,6 @@ async function fetchAPI<T>(
   }
 }
 
-
 export async function registerUser(
   email: string,
   password: string,
@@ -56,7 +55,6 @@ export async function loginUser(
   });
 }
 
-
 export async function getJobs(params?: {
   page?: number;
   limit?: number;
@@ -69,9 +67,9 @@ export async function getJobs(params?: {
   
   if (params?.page) searchParams.append('page', params.page.toString());
   if (params?.limit) searchParams.append('limit', params.limit.toString());
-  if (params?.search) searchParams.append('search', params.search);
+  if (params?.search && params.search.trim()) searchParams.append('search', params.search.trim());
   if (params?.type && params.type !== 'ALL') searchParams.append('type', params.type);
-  if (params?.location) searchParams.append('location', params.location);
+  if (params?.location && params.location.trim()) searchParams.append('location', params.location.trim());
   if (params?.sortBy) searchParams.append('sortBy', params.sortBy);
 
   const queryString = searchParams.toString();
@@ -93,7 +91,6 @@ export async function triggerScrape(): Promise<ApiResponse<{ message: string }>>
     method: 'POST',
   });
 }
-
 
 export async function saveJob(
   jobId: string,
@@ -134,7 +131,6 @@ export async function isJobSaved(
     return false;
   }
 }
-
 
 export async function checkHealth(): Promise<{ status: string; timestamp: string }> {
   return fetchAPI('../../health'); 
