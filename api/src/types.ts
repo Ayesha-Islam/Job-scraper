@@ -4,12 +4,12 @@ export { JobType } from '@prisma/client';
 export type Job = PrismaJob;
 
 export interface JobFilters {
-  search?: string;      
-  company?: string;   
-  location?: string;    
-  type?: PrismaJobType;       
-  source?: string;      
-  sortBy?: string; 
+  search?: string;
+  company?: string;
+  location?: string;
+  type?: PrismaJobType;
+  source?: string;
+  sortBy?: string;
 }
 
 export interface PaginationMeta {
@@ -37,6 +37,7 @@ export interface ApiResponse<T = any> {
 
 export interface JobStats {
   total: number;
+  addedToday: number;
   bySource: SourceStats[];
   byType: TypeStats[];
 }
@@ -84,11 +85,11 @@ export interface RegisterData {
 }
 
 export interface AuthResponse {
-  id: number | string; 
+  id: number | string;
   email: string;
   name: string;
   token?: string;
-  created_at?: string; 
+  created_at?: string;
 }
 
 export interface HealthCheckResponse {

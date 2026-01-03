@@ -109,13 +109,29 @@ export class JobService {
             return cached;
         }
 
-        const [total, bySource, byType] = await Promise.all([
+        console.log(chalk.cyan('   🔄 Calculating fresh stats...'));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+
+
+        const [total, addedToday, bySource, byType] = await Promise.all([
             this.container.db.job.count({ where: { isActive: true } }),
+            this.container.db.job.count({
+                where: {
+                    isActive: true,
+                    createdAt: {
+                        gte: today,
+                    },
+                },
+            }),
+
             this.container.db.job.groupBy({
                 by: ['source'],
                 where: { isActive: true },
                 _count: { source: true },
             }),
+
             this.container.db.job.groupBy({
                 by: ['type'],
                 where: { isActive: true },
@@ -125,9 +141,12 @@ export class JobService {
 
         const stats: JobStats = {
             total,
+            addedToday,
             bySource: bySource.map(s => ({ source: s.source, count: s._count.source })),
             byType: byType.map(t => ({ type: t.type, count: t._count.type })),
         };
+
+        console.log(chalk.green(`   ✅ Stats calculated: ${total} total, ${addedToday} added today`));
 
         await this.cache.set(cacheKey, stats, 1800);
         return stats;
@@ -177,6 +196,10 @@ export class JobService {
             }
         }
 
+        if (added > 0) {
+            await this.cache.deletePattern('stats:*');
+            console.log(chalk.gray('   🔄 Stats cache invalidated'));
+        }
         return { added, duplicates };
     }
 
