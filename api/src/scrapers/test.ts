@@ -1,24 +1,31 @@
 import { Container } from '../container';
 import { LinkedInScraper } from './linkedin';
+import { RemotiveScraper } from './remotive';
+import { WWRScraper } from './wwr';
 
-async function test() {
+async function runAllScrapers() {
   const container = Container.getInstance();
   
   try {
-    const scraper = new LinkedInScraper(container);
-    const result = await scraper.scrapeAndSave(container.jobService);
+    const jobService = container.jobService;
     
-    console.log('\n✅ Test Results:');
-    console.log(`Jobs Found: ${result.jobsFound}`);
-    console.log(`Jobs Added: ${result.jobsAdded}`);
-    console.log(`Duplicates: ${result.jobsDuplicate}`);
-    console.log(`Status: ${result.status}`);
-    
+    const wwrScraper = new WWRScraper(container);
+    const wwrResult = await wwrScraper.scrapeAndSave(jobService);
+    console.log(`WWR Results: Found ${wwrResult.jobsFound}, Added ${wwrResult.jobsAdded}`);
+
+    const liScraper = new LinkedInScraper(container);
+    const liResult = await liScraper.scrapeAndSave(jobService);
+    console.log(`LinkedIn Results: Found ${liResult.jobsFound}, Added ${liResult.jobsAdded}`);
+
+    const remScraper = new RemotiveScraper(container);
+    const remResult = await remScraper.scrapeAndSave(jobService);
+    console.log(`Remotive Results: Found ${remResult.jobsFound}, Added ${remResult.jobsAdded}`)
+
   } catch (error) {
-    console.error('❌ Test failed:', error);
+    console.error('Fatal scraping error:', error);
   } finally {
     await container.close();
   }
 }
 
-test();
+runAllScrapers();

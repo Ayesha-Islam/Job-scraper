@@ -1,5 +1,5 @@
 import { Container } from '../container';
-import { Job, JobType, JobFilters, PaginatedResponse, JobStats } from '../types'; 
+import { Job, JobType, JobFilters, PaginatedResponse, JobStats } from '../types';
 import { createHash } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import chalk from 'chalk';
@@ -104,7 +104,10 @@ export class JobService {
         const cacheKey = this.cache.generateKey('stats', {});
 
         const cached = await this.cache.get<JobStats>(cacheKey);
-        if (cached) return cached;
+        if (cached) {
+            console.log(chalk.gray('   📦 Stats cache hit'));
+            return cached;
+        }
 
         const [total, bySource, byType] = await Promise.all([
             this.container.db.job.count({ where: { isActive: true } }),

@@ -101,7 +101,6 @@ export class RemotiveScraper extends BaseScraper {
       console.log(chalk.cyan(`📋 Extracted ${jobsData.length} jobs from page`));
 
       for (const data of jobsData) {
-        // Fixed: Create ScrapedJob with all required fields
         const job: ScrapedJob = {
           company: this.cleanText(data.company),
           position: this.cleanText(data.position),
