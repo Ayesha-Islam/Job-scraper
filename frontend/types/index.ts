@@ -20,6 +20,7 @@ export type JobType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'INTERNSHIP';
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
+  error?: string;
   message?: string;
 }
 
@@ -35,9 +36,9 @@ export interface PaginatedResponse<T> {
 
 export interface Stats {
   total: number;
+  addedToday?: number;
   bySource: { source: string; count: number }[];
   byType: { type: string; count: number }[];
-  addedToday?: number;
 }
 
 export interface JobFilters {

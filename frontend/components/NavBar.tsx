@@ -62,11 +62,13 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-4">
+            {/*
             <Link href="/jobs">
               <Button variant="ghost" size="sm">
                 Find Jobs
               </Button>
             </Link>
+            */}
 
             {status === "loading" ? (
               <div className="w-10 h-10 bg-gray-100 rounded-full animate-pulse" />
@@ -112,7 +114,6 @@ export default function Navbar() {
                       </Link>
                     </div>
                   </div>
-
                   <DropdownMenuSeparator />
 
                   <DropdownMenuGroup className="py-1">
@@ -166,6 +167,6 @@ export default function Navbar() {
           </div>
         </div>
       </div>
-    </nav>
+    </nav >
   );
 }
