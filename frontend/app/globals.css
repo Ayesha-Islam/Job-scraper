@@ -131,16 +131,21 @@
   .scrollbar-thin::-webkit-scrollbar {
     width: 8px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-track {
     @apply bg-gray-100;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     @apply bg-gray-300 rounded-full;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     @apply bg-gray-400;
+  }
+
+  .btn {
+    background: linear-gradient(90deg, #5148b3 0%, #1d1233 50%, #4a3899 100%);
+    color: #ffffff;
   }
 }

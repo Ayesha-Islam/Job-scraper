@@ -36,7 +36,7 @@ export interface PaginatedResponse<T> {
 
 export interface Stats {
   total: number;
-  addedToday?: number;
+  addedToday: number;
   bySource: { source: string; count: number }[];
   byType: { type: string; count: number }[];
 }

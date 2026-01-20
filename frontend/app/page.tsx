@@ -1,210 +1,218 @@
-"use client";
+'use client'
 
-import { useState, useEffect } from "react";
-import { Job, JobFilters as JobFiltersType } from "@/types";
-import { getJobs } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Filter } from "lucide-react";
-import JobFilters from "@/components/JobFilters";
-import JobGrid from "@/components/JobGrid";
-import Pagination from "@/components/Pagination";
-import SearchBar from "@/components/SearchBar";
+import React, { useState } from 'react';
+import { ArrowRight, Briefcase, MapPin, DollarSign, Clock, Sparkles } from 'lucide-react';
 
-export default function JobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalJobs, setTotalJobs] = useState(0);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
+const JobScraperLanding = () => {
+  const [email, setEmail] = useState('');
 
-  const [filters, setFilters] = useState<JobFiltersType>({
-    search: "",
-    type: "ALL",
-    location: "",
-    sortBy: "recent",
-  });
+  const socialPlatforms = [
+    { name: 'LinkedIn', label: 'Linked in' },
+    { name: 'Instagram', label: 'Instagram' },
+    { name: 'WWR', label: 'WWR' },
+    { name: 'Indeed', label: 'indeed' },
+    { name: 'Remotive', label: 'Remotive' }
+  ];
 
-  useEffect(() => {
-    fetchJobs();
-  }, [filters, currentPage]);
+  const stats = [
+    { value: '50K+', label: 'Active Jobs' },
+    { value: '100+', label: 'Companies' },
+    { value: '10K+', label: 'Users Daily' }
+  ];
 
-  const fetchJobs = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await getJobs({
-        page: currentPage,
-        limit: 20,
-        search: filters.search || undefined,
-        type: filters.type !== "ALL" ? filters.type : undefined,
-        location: filters.location || undefined,
-        sortBy: filters.sortBy,
-      });
-
-      if (response.success && response.data) {
-        setJobs(response.data.data);
-        setTotalPages(response.data.pagination.totalPages);
-        setTotalJobs(response.data.pagination.total);
-      }
-    } catch (err) {
-      setError("Failed to load jobs. Please try again.");
-      console.error("Error fetching jobs:", err);
-    } finally {
-      setIsLoading(false);
+  const jobs = [
+    {
+      title: 'Senior Frontend Developer',
+      company: 'TechCorp',
+      location: 'Remote - Worldwide',
+      salary: '120K - 180K',
+      type: 'Full-time',
+      badge: 'LinkedIn',
+      gradient: 'from-slate-800 to-slate-900'
+    },
+    {
+      title: 'Product Designer',
+      company: 'DesignHub',
+      location: 'Remote - USA',
+      salary: '90K - 140K',
+      type: 'Full-time',
+      badge: 'WWR',
+      gradient: 'from-orange-700 to-orange-800'
+    },
+    {
+      title: 'Backend Engineer',
+      company: 'CloudScale',
+      location: 'Remote - Europe',
+      salary: '100K - 160K',
+      type: 'Full-time',
+      badge: 'Remote',
+      gradient: 'from-purple-700 to-purple-800'
     }
-  };
+  ];
 
-  const handleSearch = (query: string) => {
-    setFilters((prev) => ({ ...prev, search: query }));
-    setCurrentPage(1);
-  };
-
-  const handleFilterChange = (newFilters: JobFiltersType) => {
-    setFilters(newFilters);
-    setCurrentPage(1);
-  };
-
-  const handleClearFilters = () => {
-    setFilters({
-      search: "",
-      type: "ALL",
-      location: "",
-      sortBy: "recent",
-    });
-    setCurrentPage(1);
-  };
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const hasActiveFilters =
-    filters.type !== "ALL" || 
-    filters.location !== "" || 
-    filters.search !== "";
+  const awards = [
+    { name: 'awwwards.', subtitle: 'HONORABLE MENTION' },
+    { name: 'DESIGN KING', subtitle: 'TOP' },
+    { name: 'DN', subtitle: '' },
+    { name: 'Udemy', subtitle: '' },
+    { name: 'CSS WINNER', subtitle: 'SITES OF THE DAY' }
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1.5">
-            Remote Job Opportunities
-          </h1>
-          <p className="text-gray-600 text-sm sm:text-base">
-            {isLoading ? (
-              "Loading jobs..."
-            ) : (
-              <>
-                {totalJobs.toLocaleString()} remote {totalJobs === 1 ? "job" : "jobs"} available
-              </>
-            )}
-          </p>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="mb-5">
-          <SearchBar onSearch={handleSearch} value={filters.search} />
-        </div>
-
-        <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
-          <p className="text-sm text-gray-600">
-            {!isLoading && jobs.length > 0 && (
-              <>
-                Showing {(currentPage - 1) * 20 + 1} - {Math.min(currentPage * 20, totalJobs)} of {totalJobs} jobs
-              </>
-            )}
-          </p>
-          <div className="flex items-center gap-3">
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearFilters}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                Clear all filters
-              </Button>
-            )}
-            {filters.search && (
-              <p className="text-sm text-gray-600 hidden sm:block">
-                Search: <strong>"{filters.search}"</strong>
+    <div className='min-h-screen flex flex-col'>
+      {/* Hero Section */}
+      <section className="pt-32 pb-8 px-6 bg-cover bg-center bg-no-repeat relative text-white"
+        style={{
+          backgroundImage: `url('/bg.png')`,
+          backgroundColor: '#050505'
+        }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            {/* Left Column: Content */}
+            <div>
+              <h1 className="text-3 md:text-4xl font-bold mb-6 leading-tight">
+                Aim Higher, Reach <br />
+                Farther, Dream Bigger<br />
+              </h1>
+              <p className="text-white text-lg mb-8">
+                More than 100+ companies posting every day.
               </p>
-            )}
+              <button className="btn text-[15px] leading-tight uppercase px-8 py-4 rounded-full font-bold flex items-center gap-2 bg-gradient-to-br from-[#6167f8] to-[#4e54d4] text-white transition-all duration-200 hover:brightness-110">
+                Start the Journey <ArrowRight className="w-5 h-5" />
+              </button>
+
+              <div className="flex gap-8 mt-12 mb-8">
+                {stats.map((stat, idx) => (
+                  <div key={idx}>
+                    <div className="text-3xl font-bold">{stat.value}</div>
+                    <div className="text-sm text-white">{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="lg:hidden mb-4">
-          <Button
-            variant="outline"
-            onClick={() => setShowMobileFilters(!showMobileFilters)}
-            className="w-full"
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            {showMobileFilters ? "Hide Filters" : "Show Filters"}
-          </Button>
-        </div>
+        {/* Awards Section - Above Job Cards */}
+        <section className='border-t border-white/10 py-10'>
+          <div className="container mx-auto px-4">
+            <div className="flex flex-row items-center justify-between gap-4">
+              {socialPlatforms.map((platform, idx) => (
+                <div key={idx} className="relative group cursor-pointer flex-1 max-w-[200px]">
+                  <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-purple-400"></div>
+                  <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-purple-400"></div>
+                  <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-purple-400"></div>
+                  <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-purple-400"></div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
-          <aside
-            className={`
-              w-full lg:w-64 flex-shrink-0
-              ${showMobileFilters ? "block" : "hidden lg:block"}
-            `}
-          >
-            <div className="bg-white rounded-lg border border-gray-200 p-5 lg:sticky lg:top-6">
-              <JobFilters
-                filters={filters}
-                onFilterChange={handleFilterChange}
-                onClearFilters={handleClearFilters}
-              />
+                  <div className="py-4 px-2 text-center">
+                    <div className="text-lg md:text-xl font-bold whitespace-nowrap transition-transform group-hover:scale-105">
+                      {platform.label}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </aside>
+          </div>
+        </section>
+      </section>
 
-          <main className="flex-1 min-w-0">
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <p className="text-red-600 text-sm">{error}</p>
-                <Button
-                  variant="outline"
-                  onClick={fetchJobs}
-                  className="mt-3"
-                  size="sm"
-                >
-                  Try Again
-                </Button>
+      {/* Ready to Explore Section */}
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-12">
+            <div>
+              <h2 className="text-4xl text-black font-bold italic mb-2">Ready to Explore</h2>
+              <p className="text-black flex items-center gap-2">
+                <Briefcase className="w-4 h-4" />
+                Remote opportunities worldwide
+              </p>
+            </div>
+            <a href="#" className="text-black hover:text-black flex items-center gap-2">
+              view all jobs <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {jobs.map((job, idx) => (
+              <div key={idx} className="bg-black backdrop-blur rounded-2xl overflow-hidden border border-slate-800 hover:border-purple-500 transition-all group">
+                <div className={`bg-gradient-to-br ${job.gradient} p-8 relative`}>
+                  <div className="absolute top-4 right-4 bg-slate-900/50 backdrop-blur px-3 py-1 rounded-lg text-xs">
+                    {job.badge}
+                  </div>
+                  <div className="w-20 h-20 bg-slate-900/30 backdrop-blur rounded-2xl flex items-center justify-center border-2 border-cyan-400 mx-auto">
+                    <Briefcase className="w-10 h-10 text-cyan-400" />
+                  </div>
+                  <div className="absolute bottom-4 right-4 w-12 h-12 bg-cyan-400/20 rounded-lg transform rotate-12"></div>
+                </div>
+
+                <div className="p-6">
+                  <h3 className="text-xl text-white font-bold mb-4">{job.title}</h3>
+                  <div className="space-y-2 text-sm text-gray-400 mb-4">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-purple-400" />
+                      <span>{job.company}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-purple-400" />
+                      <span>{job.location}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-purple-400" />
+                      <span>{job.salary}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                    <div className="flex items-center gap-2 text-sm text-white">
+                      <Clock className="w-4 h-4" />
+                      {job.type}
+                    </div>
+                    <button className="text-white hover:text-purple-300 cursor-pointer flex items-center gap-1 text-sm font-medium">
+                      View Job <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
-
-            {!isLoading && jobs.length === 0 && !error && (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                <p className="text-gray-600 mb-2">No jobs found matching your criteria</p>
-                <Button
-                  variant="outline"
-                  onClick={handleClearFilters}
-                  size="sm"
-                >
-                  Clear filters
-                </Button>
-              </div>
-            )}
-
-            <JobGrid jobs={jobs} isLoading={isLoading} />
-
-            {!isLoading && !error && jobs.length > 0 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-              />
-            )}
-          </main>
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
+
+      {/* Subscribe Section */}
+      <section className="py-20 px-6 bg-black">
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="mb-8">
+            <Sparkles className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+          </div>
+          <h2 className="text-5xl text-white font-bold mb-4">
+            Subscribe to get more{' '}
+            <span className="text-white">
+              Opportunities
+            </span>
+          </h2>
+          <p className="text-gray-400 mb-8">
+            Get premium jobs and exclusive offers delivered<br />
+            straight to your inbox
+          </p>
+
+          <div className="flex items-center gap-4 max-w-xl mx-auto bg-white rounded-full p-2">
+            <div className="border-b border-b-black bg-white p-3 rounded-full">
+              <Briefcase className="w-6 h-6" />
+            </div>
+            <input
+              type="email"
+              placeholder="Type your email here"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="flex-1 bg-transparent text-black px-4 outline-none"
+            />
+            <button className="bg-black text-white px-8 py-3 rounded-full font-medium hover:bg-gray-900 transition">
+              Subscribe
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   );
-}
+};
+
+export default JobScraperLanding;

@@ -37,7 +37,7 @@ export default function JobsPage() {
     try {
       const response = await getJobs({
         page: currentPage,
-        limit: 20,
+        limit: 21,
         search: filters.search || undefined,
         type: filters.type !== "ALL" ? filters.type : undefined,
         location: filters.location || undefined,
