@@ -3,159 +3,110 @@ import { Container } from '../container';
 import { ScrapedJob } from '../types';
 import chalk from 'chalk';
 
+interface RemotiveJob {
+  id: number;
+  url: string;
+  title: string;
+  company_name: string;
+  category: string;
+  job_type: string;
+  publication_date: string;
+  candidate_required_location: string;
+  salary?: string;
+  description?: string;
+}
+
+interface RemotiveAPIResponse {
+  jobs: RemotiveJob[];
+}
+
 export class RemotiveScraper extends BaseScraper {
   constructor(container: Container) {
     const config: ScraperConfig = {
       name: 'Remotive',
-      url: 'https://remotive.com/remote-jobs/software-dev',
-      maxRetries: 3,
-      timeout: 30000,
+      url: 'https://remotive.com/api/remote-jobs?category=software-dev&limit=50',
+      maxRetries: 2,
+      timeout: 15000,
       useClaudeAPI: false,
+      useBrowser: false, 
     };
     super(container, config);
   }
 
   async scrapeJobs(): Promise<ScrapedJob[]> {
-    if (!this.page) throw new Error('Page not initialized');
-
     const jobs: ScrapedJob[] = [];
 
     try {
-      console.log(chalk.cyan('🔍 Fetching from Remotive...'));
+      console.log(chalk.cyan('🔍 Fetching from Remotive API...'));
 
-      await this.navigateTo(this.config.url);
-      await this.randomDelay(2000, 3000);
-
-      const jobsExist = await this.waitForSelector('article.job-tile, .job-list-item, [class*="job"]', 10000);
-
-      if (!jobsExist) {
-        console.log(chalk.yellow('⚠️ No jobs found with standard selectors, trying alternative...'));
-        await this.autoScroll(3, 1000);
-        await this.sleep(2000);
+      const data = await this.fetchApi<RemotiveAPIResponse>(this.config.url);
+      
+      if (!data.jobs || data.jobs.length === 0) {
+        console.log(chalk.yellow('⚠️  No jobs returned from API'));
+        return jobs;
       }
 
-      const jobsData = await this.page.evaluate(() => {
-        const results: any[] = [];
+      console.log(chalk.cyan(`📋 Retrieved ${data.jobs.length} jobs from API`));
 
-        const selectors = [
-          'article.job-tile',
-          '.job-list-item',
-          '[class*="job-tile"]',
-          'article[class*="job"]',
-          'div[class*="job-item"]'
-        ];
-
-        let jobElements: NodeListOf<Element> | null = null;
-
-        for (const selector of selectors) {
-          jobElements = document.querySelectorAll(selector);
-          if (jobElements.length > 0) {
-            console.log(`Found ${jobElements.length} jobs with selector: ${selector}`);
-            break;
-          }
+      for (const apiJob of data.jobs) {
+        if (!apiJob.title || !apiJob.company_name || !apiJob.url) {
+          continue;
         }
 
-        if (!jobElements || jobElements.length === 0) {
-          return results;
-        }
-
-        jobElements.forEach((element) => {
-          try {
-            const titleEl = element.querySelector('[class*="title"], h2, h3, .job-title');
-            const companyEl = element.querySelector('[class*="company"], .company-name');
-            const locationEl = element.querySelector('[class*="location"], .location');
-            const salaryEl = element.querySelector('[class*="salary"], .salary');
-            const linkEl = element.querySelector('a');
-            const tagsEl = element.querySelector('[class*="tags"], .tags');
-
-            const position = titleEl?.textContent?.trim() || '';
-            const company = companyEl?.textContent?.trim() || '';
-            const location = locationEl?.textContent?.trim() || '';
-            const salary = salaryEl?.textContent?.trim() || null;
-            const tags = tagsEl?.textContent?.trim() || '';
-
-            let url = '';
-            if (linkEl) {
-              const href = (linkEl as HTMLAnchorElement).href;
-              url = href.startsWith('http') ? href : `https://remotive.com${href}`;
-            }
-
-            if (position && company && url) {
-              results.push({
-                position,
-                company,
-                location: location || 'Remote - Worldwide',
-                salary,
-                url,
-                tags,
-              });
-            }
-          } catch (err) {
-            console.error('Error parsing job:', err);
-          }
-        });
-
-        return results;
-      });
-
-      console.log(chalk.cyan(`📋 Extracted ${jobsData.length} jobs from page`));
-
-      for (const data of jobsData) {
         const job: ScrapedJob = {
-          company: this.cleanText(data.company),
-          position: this.cleanText(data.position),
-          location: data.location || 'Remote - Worldwide',
-          salary: data.salary || null,
-          type: this.parseJobType(data.tags),
-          url: data.url,
+          company: this.cleanText(apiJob.company_name),
+          position: this.cleanText(apiJob.title),
+          location: apiJob.candidate_required_location || 'Remote - Worldwide',
+          salary: apiJob.salary || null,
+          type: this.parseJobType(apiJob.job_type || apiJob.category),
+          url: apiJob.url,
           source: 'Remotive',
-          description: null,
+          description: apiJob.description || null,
         };
 
         jobs.push(job);
       }
 
-      if (jobs.length === 0) {
-        console.log(chalk.yellow('⚠️ No jobs found. Taking screenshot for debugging...'));
-        await this.page.screenshot({ path: 'remotive-debug.png', fullPage: true });
-        console.log(chalk.blue('📸 Screenshot saved: remotive-debug.png'));
-      }
-
-      console.log(chalk.green(`✨ Remotive scraping complete: ${jobs.length} jobs extracted`));
+      console.log(chalk.green(`✨ Remotive API complete: ${jobs.length} jobs extracted`));
       return jobs;
 
     } catch (error) {
-      console.error(chalk.red('❌ Remotive scrape failed:'), error);
-      throw new Error(`Remotive scraping failed: ${error}`);
+      console.error(chalk.red('❌ Remotive API error:'), error);
+      return [];
     }
   }
 
+  protected async initBrowser(): Promise<void> {
+    console.log(chalk.gray('ℹ️  Using API mode (no browser needed)'));
+  }
+
+  protected async cleanup(): Promise<void> {
+  }
+
   isRemoteUS(job: ScrapedJob): boolean {
-    const location = job.location?.toLowerCase() || '';
+    const loc = (job.location || '').toLowerCase();
 
-    const isUSOrWorldwide =
-      location.includes('united states') ||
-      location.includes('usa') ||
-      location.includes('us only') ||
-      location.includes('us') ||
-      location.includes('worldwide') ||
-      location.includes('anywhere') ||
-      location.includes('remote') ||
-      location.includes('north america') ||
-      location.includes('americas');
+    const isUS = loc.includes('us') || 
+                 loc.includes('united states') ||
+                 loc.includes('usa') ||
+                 loc.includes('america');
 
-    const excludedRegions = [
+    const isWorldwide = loc.includes('worldwide') ||
+                        loc.includes('anywhere') ||
+                        (loc.includes('remote') && !loc.includes('only'));
+
+    const excluded = [
       'europe only',
-      'eu only',
+      'eu only', 
       'asia only',
       'uk only',
       'canada only',
       'latam only',
       'africa only'
     ];
+    
+    const isExcluded = excluded.some(region => loc.includes(region));
 
-    const isExcluded = excludedRegions.some(region => location.includes(region));
-
-    return isUSOrWorldwide && !isExcluded;
+    return (isUS || isWorldwide) && !isExcluded;
   }
 }

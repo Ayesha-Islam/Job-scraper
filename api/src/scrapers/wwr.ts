@@ -8,8 +8,8 @@ export class WWRScraper extends BaseScraper {
     const config: ScraperConfig = {
       name: 'WeWorkRemotely',
       url: 'https://weworkremotely.com/categories/remote-programming-jobs',
-      maxRetries: 3,
-      timeout: 30000,
+      maxRetries: 2, 
+      timeout: 20000, 
       useClaudeAPI: false,
     };
     super(container, config);
@@ -24,27 +24,16 @@ export class WWRScraper extends BaseScraper {
       console.log(chalk.cyan('🔍 Navigating to WeWorkRemotely...'));
 
       await this.navigateTo(this.config.url);
-      await this.randomDelay(2000, 3000);
+      await this.sleep(1000); 
 
-      const hasJobs = await this.waitForSelector('li.feature, section.jobs', 10000);
+      const hasJobs = await this.waitForSelector('li.feature, section.jobs', 5000);
       if (!hasJobs) {
         throw new Error('Job listings not found');
       }
 
-      console.log(chalk.green('✓ Found job listings'));
-
       const jobsData = await this.page.evaluate(() => {
         const results: any[] = [];
-
         const jobElements = document.querySelectorAll('li.feature, section.jobs li');
-
-        console.log(`
-🔍 Debug Info:
-  li.feature: ${document.querySelectorAll('li.feature').length}
-  section.jobs li: ${document.querySelectorAll('section.jobs li').length}
-  span.company: ${document.querySelectorAll('span.company').length}
-  Elements with href: ${document.querySelectorAll('li a[href*="/remote-jobs/"]').length}
-        `);
 
         jobElements.forEach((element) => {
           try {
@@ -52,11 +41,8 @@ export class WWRScraper extends BaseScraper {
             if (!linkEl) return;
 
             let company = '';
-
-            const linkText = linkEl.textContent || '';
-            const linkTitle = (linkEl as HTMLAnchorElement).title || '';
-
             const href = (linkEl as HTMLAnchorElement).href;
+            
             const urlMatch = href.match(/\/company\/([\w-]+)/);
             if (urlMatch) {
               company = urlMatch[1]
@@ -65,53 +51,44 @@ export class WWRScraper extends BaseScraper {
                 .join(' ');
             }
 
-            const companyEl = element.querySelector('span.company, .company-name, [class*="company"]');
-            if (companyEl && companyEl.textContent?.trim()) {
+            const companyEl = element.querySelector('span.company, .company-name');
+            if (companyEl?.textContent?.trim()) {
               company = companyEl.textContent.trim();
             }
 
+            const linkText = linkEl.textContent || '';
             const atMatch = linkText.match(/at\s+(.+?)(?:\s*\||$)/i);
             if (atMatch) {
               company = atMatch[1].trim();
             }
 
             const position = linkEl.textContent?.trim() || '';
-
             const regionEl = element.querySelector('.region, [class*="location"]');
             const location = regionEl?.textContent?.trim() || 'Anywhere';
-
-            const url = href;
-
             const tagsEl = element.querySelector('.tags');
             const tags = tagsEl?.textContent?.trim() || '';
 
-            if (position && url) {
+            if (position && href && position.length >= 3) {
               results.push({
                 position,
                 company: company || 'Remote Company',
                 location,
-                url,
+                url: href,
                 tags,
               });
             }
           } catch (err) {
-            console.error('Error parsing WWR job:', err);
+            console.error('Error parsing job:', err);
           }
         });
 
         return results;
       });
 
-      console.log(chalk.cyan(`📋 Extracted ${jobsData.length} jobs from page`));
+      console.log(chalk.cyan(`📋 Extracted ${jobsData.length} jobs`));
 
       for (const data of jobsData) {
-        if (!data.position || data.position.length < 3) {
-          console.log(chalk.gray(`  ↳ Skipping: No valid position title (${data.url})`));
-          continue;
-        }
-
-        // Fixed: Create ScrapedJob with all required fields
-        const job: ScrapedJob = {
+        jobs.push({
           company: this.cleanText(data.company),
           position: this.cleanText(data.position),
           location: data.location || 'Remote',
@@ -120,21 +97,17 @@ export class WWRScraper extends BaseScraper {
           url: data.url,
           source: 'WeWorkRemotely',
           description: null,
-        };
-
-        jobs.push(job);
+        });
       }
 
-      console.log(chalk.green(`✨ WeWorkRemotely scraping complete: ${jobs.length} jobs extracted`));
       return jobs;
-
     } catch (error) {
       throw new Error(`WeWorkRemotely scraping failed: ${error}`);
     }
   }
 
   isRemoteUS(job: ScrapedJob): boolean {
-    const location = job.location?.toLowerCase() || '';
+    const loc = (job.location || '').toLowerCase();
 
     const excluded = [
       'europe only',
@@ -144,8 +117,6 @@ export class WWRScraper extends BaseScraper {
       'latin america only'
     ];
 
-    const isExcluded = excluded.some(region => location.includes(region));
-
-    return !isExcluded;
+    return !excluded.some(region => loc.includes(region));
   }
 }

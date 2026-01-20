@@ -66,11 +66,11 @@ export interface ScrapedJob {
   position: string;
   company: string;
   location: string;
-  salary?: string | null;
+  salary: string;
   type: PrismaJobType;
   url: string;
   source: string;
-  description?: string | null;
+  description: string;
 }
 
 export interface LoginCredentials {

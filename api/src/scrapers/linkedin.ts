@@ -8,7 +8,7 @@ export class LinkedInScraper extends BaseScraper {
   constructor(container: Container) {
     const config: ScraperConfig = {
       name: 'LinkedIn',
-      url: 'https://www.linkedin.com/jobs/search/?keywords=software%20engineer&location=United%20States&f_WT=2&position=1&pageNum=0',
+      url:'https://www.linkedin.com/jobs/search/?currentJobId=4351261885&f_WT=2&geoId=103644278&origin=JOB_SEARCH_PAGE_SEARCH_BUTTON&refresh=true',
       maxRetries: 3,
       timeout: 60000,
       useClaudeAPI: false,
@@ -93,7 +93,6 @@ export class LinkedInScraper extends BaseScraper {
             return;
           }
 
-          // Fixed: Create ScrapedJob instead of Job
           const job: ScrapedJob = {
             company: this.cleanText(company),
             position: this.cleanText(position),
@@ -102,7 +101,7 @@ export class LinkedInScraper extends BaseScraper {
             type: JobType.FULL_TIME,
             url: url || `https://linkedin.com/jobs/view/${Date.now()}-${index}`,
             source: 'LinkedIn',
-            description: null, // Changed from undefined to null
+            description: null, 
           };
 
           jobs.push(job);
