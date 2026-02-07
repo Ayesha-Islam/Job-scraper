@@ -4,10 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { 
-  LogOut, 
-  Bookmark, 
-  Settings 
+import {
+  LogOut,
+  Bookmark,
+  Settings
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -49,13 +49,13 @@ export default function Navbar() {
   if (!mounted) return <div className="h-20 bg-transparent" />;
 
   return (
-    <nav className="absolute top-0 left-0 w-full z-50 bg-black py-4 px-6">
+    <nav className="absolute top-0 left-0 w-full z-50 bg-transparent py-4 px-6">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        
+
         {/* LOGO */}
         <Link href="/" className="flex items-center gap-2 group">
-          
-          <span className="text-white font-bold text-xl tracking-tight hidden sm:block">
+
+          <span className="text-black font-bold text-xl tracking-tight hidden sm:block">
             JobScraper
           </span>
         </Link>
@@ -63,17 +63,17 @@ export default function Navbar() {
         <div className="hidden lg:block">
           <NavigationMenu>
             <NavigationMenuList className="gap-2">
-              
+
               <NavigationMenuItem>
-                <Link href="/" passHref={true}>
-                  <NavigationMenuLink className={cn(navigationMenuTriggerStyle(), "bg-transparent text-gray-200 hover:bg-white/10 hover:text-white")}>
+                <NavigationMenuLink asChild>
+                  <Link href="/" className={cn(navigationMenuTriggerStyle(), "bg-transparent text-black hover:bg-black/10 hover:text-black")}>
                     Home
-                  </NavigationMenuLink>
-                </Link>
+                  </Link>
+                </NavigationMenuLink>
               </NavigationMenuItem>
 
               <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent text-gray-200 hover:bg-white/10 hover:text-white">
+                <NavigationMenuTrigger className="bg-transparent text-black hover:bg-black/10 hover:text-black">
                   Services
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
@@ -89,11 +89,11 @@ export default function Navbar() {
               </NavigationMenuItem>
 
               <NavigationMenuItem>
-                <Link href="/stats" passHref>
-                  <NavigationMenuLink className={cn(navigationMenuTriggerStyle(), "bg-transparent text-gray-200 hover:bg-white/10 hover:text-white")}>
+                <NavigationMenuLink asChild>
+                  <Link href="/stats" className={cn(navigationMenuTriggerStyle(), "bg-transparent text-black hover:bg-black/10 hover:text-black")}>
                     Portfolio
-                  </NavigationMenuLink>
-                </Link>
+                  </Link>
+                </NavigationMenuLink>
               </NavigationMenuItem>
 
             </NavigationMenuList>
@@ -149,11 +149,14 @@ export default function Navbar() {
           ) : (
             <div className="flex items-center gap-3">
               <Link href="/login">
-                <Button variant="ghost" className="text-white hover:bg-white/10">Login</Button>
+                <Button variant="ghost"
+                  className="px-4 py-1 bg-white rounded-full text-sm border border-black hover:bg-gray-100"
+                >Login</Button>
               </Link>
-              <Link href="/contact">
-                <Button className="rounded-xl font-semibold text-white bg-gradient-to-r from-[#4e54c8] to-[#8f94fb] hover:opacity-90 shadow-lg border-none px-6">
-                  +1-256-548-8850
+              <Link href="/register">
+                <Button className="px-4 py-1 bg-[#b8a8d8] rounded-full text-sm text-black border border-black hover:bg-[#a898c8]"
+                >
+                  Register
                 </Button>
               </Link>
             </div>

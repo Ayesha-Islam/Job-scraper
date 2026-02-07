@@ -101,7 +101,7 @@ export default function JobDetailsPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-                {job.position}
+                {job.title}
               </h1>
 
               <div className="flex items-center gap-2 mb-2">

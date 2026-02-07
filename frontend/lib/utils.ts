@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -9,10 +10,10 @@ export function formatJobType(
   type: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP"
 ): string {
   const typeMap: Record<string, string> = {
-    FULL_TIME: "Full-time",
-    PART_TIME: "Part-time",
-    CONTRACT: "Contract",
-    INTERNSHIP: "Internship",
+    FULL_TIME: "FULL_TIME",
+    PART_TIME: "PART_TIME",
+    CONTRACT: "CONTRACT",
+    INTERNSHIP: "INTERNSHIP",
   };
 
   return typeMap[type] || type;

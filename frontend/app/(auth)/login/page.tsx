@@ -33,7 +33,7 @@ export default function LoginPage() {
                 setError("Invalid email or password");
 
             } else {
-                router.push("/");
+                router.push("/jobs");
                 router.refresh();
             }
         } catch (error) {

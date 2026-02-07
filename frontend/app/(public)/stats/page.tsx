@@ -286,10 +286,10 @@ function getUniqueCompaniesCount(stats: Stats): number {
 
 function formatJobType(type: string): string {
   const typeMap: Record<string, string> = {
-    FULL_TIME: "Full-time",
-    PART_TIME: "Part-time",
-    CONTRACT: "Contract",
-    INTERNSHIP: "Internship",
+    FULL_TIME: "FULL_TIME",
+    PART_TIME: "PART_TIME",
+    CONTRACT: "CONTRACT",
+    INTERNSHIP: "INTERNSHIP",
   };
   return typeMap[type] || type;
 }

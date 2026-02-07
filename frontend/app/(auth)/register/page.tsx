@@ -54,7 +54,7 @@ export default function RegisterPage() {
                 if (loginRes?.error) {
                     setError("Account created, but auto-login failed. Please sign in.");
                 } else {
-                    router.push("/");
+                    router.push("/jobs");
                     router.refresh();
                 }
             }
