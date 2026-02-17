@@ -45,7 +45,7 @@ export default function StatsPage() {
 
   if (error || !stats) {
     return (
-      <div className="min-h-screen bg-gray-100 py-12">
+      <div className="min-h-screen bg-[#0B1421] py-12">
         <div>
           <div className="text-center">
             <h1 className="text-3xl font-bold text-gray-900 mb-4">
@@ -59,15 +59,14 @@ export default function StatsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white">
-        <div className="py-8">
+    <div className="min-h-screen bg-[#0B1421] pt-14">
+      <div>
+        <div className="py-8 ">
           <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
+            <h1 className="text-3xl sm:text-4xl font-bold text-[#FFFFFF] mb-3">
               Remote Job Market Statistics
             </h1>
-            <p className="text-gray-600 text-base sm:text-lg">
+            <p className="text-gray-400 text-base sm:text-lg">
               Real-time insights into the remote job market. Data updated every 30 minutes.
             </p>
           </div>
@@ -75,9 +74,7 @@ export default function StatsPage() {
       </div>
 
       <div className="py-8 p-8">
-        {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          {/* Total Jobs */}
           <StatCard
             icon={<Briefcase className="w-6 h-6" />}
             label="Total Jobs"
@@ -108,9 +105,9 @@ export default function StatsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
+          <Card className="border border-gray-600">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center text-white gap-2">
                 <Globe className="w-5 h-5 text-blue-600" />
                 Jobs by Source
               </CardTitle>
@@ -132,9 +129,9 @@ export default function StatsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border border-gray-600">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center text-white gap-2">
                 <Users className="w-5 h-5 text-green-600" />
                 Jobs by Type
               </CardTitle>
@@ -145,10 +142,10 @@ export default function StatsPage() {
                   const percentage = (type.count / stats.total) * 100;
                   return (
                     <TypeBar
-                          key={index}
-                          type={formatJobType(type.type)}
-                          count={type.count}
-                          percentage={percentage} name={""}                    />
+                      key={index}
+                      type={formatJobType(type.type)}
+                      count={type.count}
+                      percentage={percentage} name={""} />
                   );
                 })}
               </div>
@@ -156,15 +153,15 @@ export default function StatsPage() {
           </Card>
         </div>
 
-        <Card className="mt-8">
+        <Card className="mt-8 border border-gray-600">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
               <Clock className="w-5 h-5 text-gray-500 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-gray-900 mb-1">
+                <h3 className="font-semibold text-white mb-1">
                   How often is data updated?
                 </h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-400">
                   Our scrapers run every 30 minutes to bring you the latest job opportunities
                   from top remote job boards including LinkedIn, Remotive, and WeWorkRemotely.
                 </p>
@@ -193,15 +190,15 @@ function StatCard({ icon, label, value, color }: StatCardProps) {
   };
 
   return (
-    <Card>
+    <Card className="border border-gray-600">
       <CardContent className="pt-6">
         <div className="flex items-center gap-4">
           <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
             {icon}
           </div>
           <div>
-            <p className="text-sm text-gray-600 mb-1">{label}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+            <p className="text-sm text-gray-400 mb-1">{label}</p>
+            <p className="text-2xl font-bold text-white">{value}</p>
           </div>
         </div>
       </CardContent>
@@ -281,7 +278,7 @@ function StatsPageSkeleton() {
 }
 
 function getUniqueCompaniesCount(stats: Stats): number {
-  return Math.floor(stats.total * 0.3); 
+  return Math.floor(stats.total * 0.3);
 }
 
 function formatJobType(type: string): string {

@@ -1,6 +1,26 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import { JobType } from '@/types';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 export interface FilterOptions {
   jobTypes: JobType[];
@@ -14,22 +34,54 @@ interface FilterPanelProps {
   onApplyFilters: (filters: FilterOptions) => void;
 }
 
-export function FilterPanel({ onClose, onApplyFilters }: FilterPanelProps) {
-  const [filters, setFilters] = useState<FilterOptions>({
-    jobTypes: [],
-    remote: null,
-    salaryRange: '',
-    experience: [],
-  });
+const JOB_TYPES: { value: JobType; label: string }[] = [
+  { value: 'FULL_TIME',  label: 'Full-time'  },
+  { value: 'PART_TIME',  label: 'Part-time'  },
+  { value: 'CONTRACT',   label: 'Contract'   },
+  { value: 'INTERNSHIP', label: 'Internship' },
+];
 
-  const handleJobTypeToggle = (type: JobType) => {
+const EXPERIENCE_LEVELS = [
+  'Entry Level',
+  'Mid Level',
+  'Senior Level',
+  'Lead',
+  'Executive',
+];
+
+const SALARY_RANGES = [
+  { value: '0-50k',     label: '$0 – $50k'    },
+  { value: '50k-100k',  label: '$50k – $100k'  },
+  { value: '100k-150k', label: '$100k – $150k' },
+  { value: '150k-200k', label: '$150k – $200k' },
+  { value: '200k+',     label: '$200k+'        },
+];
+
+const EMPTY_FILTERS: FilterOptions = {
+  jobTypes:    [],
+  remote:      null,
+  salaryRange: '',
+  experience:  [],
+};
+
+export function FilterPanel({ onClose, onApplyFilters }: FilterPanelProps) {
+  const [filters, setFilters] = useState<FilterOptions>(EMPTY_FILTERS);
+
+  const toggleJobType = (type: JobType) =>
     setFilters(prev => ({
       ...prev,
       jobTypes: prev.jobTypes.includes(type)
         ? prev.jobTypes.filter(t => t !== type)
-        : [...prev.jobTypes, type]
+        : [...prev.jobTypes, type],
     }));
-  };
+
+  const toggleExperience = (level: string) =>
+    setFilters(prev => ({
+      ...prev,
+      experience: prev.experience.includes(level)
+        ? prev.experience.filter(l => l !== level)
+        : [...prev.experience, level],
+    }));
 
   const handleApply = () => {
     onApplyFilters(filters);
@@ -37,103 +89,175 @@ export function FilterPanel({ onClose, onApplyFilters }: FilterPanelProps) {
   };
 
   const handleReset = () => {
-    const resetFilters: FilterOptions = {
-      jobTypes: [],
-      remote: null,
-      salaryRange: '',
-      experience: [],
-    };
-    setFilters(resetFilters);
-    onApplyFilters(resetFilters);
+    setFilters(EMPTY_FILTERS);
+    onApplyFilters(EMPTY_FILTERS);
   };
 
+  const activeFilterCount =
+    filters.jobTypes.length +
+    filters.experience.length +
+    (filters.remote !== null ? 1 : 0) +
+    (filters.salaryRange ? 1 : 0);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white border-2 border-black rounded-3xl max-w-md w-full p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">Filters</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Sheet open={true} onOpenChange={onClose}>
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-[#0B1421] border-white/10 text-white">
+        <SheetHeader>
+          <SheetTitle className="flex items-center justify-between text-white">
+            <span>Filters</span>
+            {activeFilterCount > 0 && (
+              <Badge className="bg-white/10 text-white border border-white/20 text-xs">
+                {activeFilterCount} active
+              </Badge>
+            )}
+          </SheetTitle>
+          <SheetDescription className="text-gray-400">
+            Refine your job search with these filters
+          </SheetDescription>
+        </SheetHeader>
 
-        {/* Job Type */}
-        <div className="mb-6">
-          <h3 className="font-semibold mb-3">Job Type</h3>
-          <div className="space-y-2">
-            {(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP'] as JobType[]).map((type) => (
-              <label key={type} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.jobTypes.includes(type)}
-                  onChange={() => handleJobTypeToggle(type)}
-                  className="w-4 h-4 rounded border-gray-300"
-                />
-                <span className="text-sm capitalize">
-                  {type.toLowerCase().replace('_', ' ')}
-                </span>
-              </label>
-            ))}
+        <div className="space-y-6 py-6">
+          <div className="space-y-3">
+            <Label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Job Type
+            </Label>
+            <div className="space-y-2.5">
+              {JOB_TYPES.map(({ value, label }) => (
+                <div key={value} className="flex items-center space-x-2.5">
+                  <Checkbox
+                    id={`job-type-${value}`}
+                    checked={filters.jobTypes.includes(value)}
+                    onCheckedChange={() => toggleJobType(value)}
+                    className="border-white/30 data-[state=checked]:bg-[#15202B] data-[state=checked]:border-white/40"
+                  />
+                  <Label
+                    htmlFor={`job-type-${value}`}
+                    className="text-sm font-normal text-gray-300 cursor-pointer hover:text-white transition-colors"
+                  >
+                    {label}
+                  </Label>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Remote Work */}
-        <div className="mb-6">
-          <h3 className="font-semibold mb-3">Work Location</h3>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="remote"
-                checked={filters.remote === null}
-                onChange={() => setFilters(prev => ({ ...prev, remote: null }))}
-                className="w-4 h-4"
-              />
-              <span className="text-sm">All</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="remote"
-                checked={filters.remote === true}
-                onChange={() => setFilters(prev => ({ ...prev, remote: true }))}
-                className="w-4 h-4"
-              />
-              <span className="text-sm">Remote</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="remote"
-                checked={filters.remote === false}
-                onChange={() => setFilters(prev => ({ ...prev, remote: false }))}
-                className="w-4 h-4"
-              />
-              <span className="text-sm">On-site</span>
-            </label>
+          <Separator className="bg-white/10" />
+
+          <div className="space-y-3">
+            <Label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Work Location
+            </Label>
+            <RadioGroup
+              value={
+                filters.remote === null ? 'any'
+                : filters.remote ? 'remote'
+                : 'onsite'
+              }
+              onValueChange={(value) =>
+                setFilters(prev => ({
+                  ...prev,
+                  remote: value === 'any' ? null : value === 'remote',
+                }))
+              }
+              className="space-y-2.5"
+            >
+              {[
+                { value: 'any',    label: 'All Locations' },
+                { value: 'remote', label: 'Remote Only'   },
+                { value: 'onsite', label: 'On-site Only'  },
+              ].map(({ value, label }) => (
+                <div key={value} className="flex items-center space-x-2.5">
+                  <RadioGroupItem
+                    value={value}
+                    id={`location-${value}`}
+                    className="border-white/30 text-white"
+                  />
+                  <Label
+                    htmlFor={`location-${value}`}
+                    className="text-sm font-normal text-gray-300 cursor-pointer hover:text-white transition-colors"
+                  >
+                    {label}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
           </div>
+
+          <Separator className="bg-white/10" />
+
+          <div className="space-y-3">
+            <Label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Salary Range
+            </Label>
+            <Select
+              value={filters.salaryRange || 'any'}
+              onValueChange={(value) =>
+                setFilters(prev => ({
+                  ...prev,
+                  salaryRange: value === 'any' ? '' : value,
+                }))
+              }
+            >
+              <SelectTrigger className="bg-white/5 border-white/20 text-gray-300 hover:bg-white/10 focus:ring-white/20">
+                <SelectValue placeholder="Select salary range" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#16181d] border-white/10 text-gray-300">
+                <SelectItem value="any" className="focus:bg-white/10 focus:text-white">
+                  Any
+                </SelectItem>
+                {SALARY_RANGES.map(({ value, label }) => (
+                  <SelectItem key={value} value={value} className="focus:bg-white/10 focus:text-white">
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator className="bg-white/10" />
+
+          <div className="space-y-3">
+            <Label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Experience Level
+            </Label>
+            <div className="space-y-2.5">
+              {EXPERIENCE_LEVELS.map((level) => (
+                <div key={level} className="flex items-center space-x-2.5">
+                  <Checkbox
+                    id={`experience-${level}`}
+                    checked={filters.experience.includes(level)}
+                    onCheckedChange={() => toggleExperience(level)}
+                    className="border-white/30 data-[state=checked]:bg-[#15202B] data-[state=checked]:border-white/40"
+                  />
+                  <Label
+                    htmlFor={`experience-${level}`}
+                    className="text-sm font-normal text-gray-300 cursor-pointer hover:text-white transition-colors"
+                  >
+                    {level}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3">
-          <button
+        <SheetFooter className="gap-2 pt-2 border-t border-white/10">
+          <Button
+            variant="outline"
             onClick={handleReset}
-            className="flex-1 py-2 px-4 border-2 border-black rounded-full hover:bg-gray-50 transition-colors font-medium"
+            className="w-full sm:w-auto bg-transparent border-white/20 text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
           >
-            Reset
-          </button>
-          <button
+            Reset All
+          </Button>
+          <Button
             onClick={handleApply}
-            className="flex-1 py-2 px-4 bg-[#b8a8d8] border-2 border-black rounded-full hover:bg-[#a898c8] transition-colors font-medium"
+            className="w-full sm:w-auto bg-[#15202B] text-white border border-white/20 hover:bg-[#1e2d3d] transition-colors"
           >
             Apply Filters
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

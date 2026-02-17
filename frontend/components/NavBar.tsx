@@ -7,31 +7,41 @@ import { useRouter } from "next/navigation";
 import {
   LogOut,
   Bookmark,
-  Settings
+  Settings,
+  SlidersHorizontal,
+  User,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   NavigationMenu,
-  NavigationMenuContent,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
-  NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuSeparator,
   DropdownMenuItem,
-  DropdownMenuGroup
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
-export default function Navbar() {
+interface NavbarProps {
+  showFilterButton?: boolean;
+  onFilterClick?: () => void;
+  activeFilterCount?: number;
+}
+
+export default function Navbar({
+  showFilterButton = false,
+  onFilterClick,
+  activeFilterCount = 0,
+}: NavbarProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
@@ -48,14 +58,14 @@ export default function Navbar() {
 
   if (!mounted) return <div className="h-20 bg-transparent" />;
 
+  const userInitial = session?.user?.name?.[0]?.toUpperCase() ?? "U";
+
   return (
-    <nav className="absolute top-0 left-0 w-full z-50 bg-transparent py-4 px-6">
+    <nav className="fixed bg-[#0B1421] top-0 left-0 w-full z-50 backdrop-blur-md shadow-sm py-4 px-6">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
 
-        {/* LOGO */}
         <Link href="/" className="flex items-center gap-2 group">
-
-          <span className="text-black font-bold text-xl tracking-tight hidden sm:block">
+          <span className="font-bold text-white text-xl tracking-tight hidden sm:block">
             JobScraper
           </span>
         </Link>
@@ -63,99 +73,160 @@ export default function Navbar() {
         <div className="hidden lg:block">
           <NavigationMenu>
             <NavigationMenuList className="gap-2">
-
               <NavigationMenuItem>
                 <NavigationMenuLink asChild>
-                  <Link href="/" className={cn(navigationMenuTriggerStyle(), "bg-transparent text-black hover:bg-black/10 hover:text-black")}>
+                  <Link
+                    href="/"
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "bg-transparent text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                    )}
+                  >
                     Home
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
 
               <NavigationMenuItem>
-                <NavigationMenuTrigger className="bg-transparent text-black hover:bg-black/10 hover:text-black">
-                  Services
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                    <ListItem href="/services/scraping" title="AI Scraping">
-                      Automated job extraction using advanced LLMs.
-                    </ListItem>
-                    <ListItem href="/services/analytics" title="Market Stats">
-                      Real-time insights into industry hiring trends.
-                    </ListItem>
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
+                <NavigationMenuLink>
+                  <Link href="/stats"
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "bg-transparent text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                    )}
 
-              <NavigationMenuItem>
-                <NavigationMenuLink asChild>
-                  <Link href="/stats" className={cn(navigationMenuTriggerStyle(), "bg-transparent text-black hover:bg-black/10 hover:text-black")}>
-                    Portfolio
+                  >
+                    Services
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
 
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <Link
+                    href="/portfolio"
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "bg-transparent text-white hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                    )}
+                  >
+                    Portfolio
+                  </Link>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
             </NavigationMenuList>
           </NavigationMenu>
         </div>
 
         <div className="flex items-center gap-4">
+
+          {showFilterButton && onFilterClick && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onFilterClick}
+              className="relative border-white/20 text-white bg-transparent hover:bg-white/10 hover:text-white"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {activeFilterCount > 0 && (
+                <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-white">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
+          )}
+
           {status === "loading" ? (
-            <div className="w-10 h-10 bg-white/10 rounded-full animate-pulse" />
+            <div className="w-10 h-10 rounded-full bg-white/10 animate-pulse" />
           ) : session ? (
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full border border-white/20 p-0">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={session.user?.image || ""} />
-                    <AvatarFallback>{session.user?.name?.[0] || "U"}</AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72 mt-2">
-                <div className="flex items-center gap-3 p-4">
+                <button className="h-10 w-10 rounded-full ring-2 ring-white/20 hover:ring-white/50 transition-all duration-200 focus:outline-none">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={session.user?.image || ""} />
-                    <AvatarFallback>{session.user?.name?.[0]}</AvatarFallback>
+                    <AvatarFallback className="bg-[#15202B] text-white text-sm font-bold">
+                      {userInitial}
+                    </AvatarFallback>
                   </Avatar>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">{session.user?.name}</p>
-                    <p className="text-xs text-muted-foreground truncate w-[180px]">{session.user?.email}</p>
+                </button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent
+                align="end"
+                sideOffset={10}
+                className="w-60 p-0 overflow-hidden rounded-2xl border border-white/10 bg-[#FFFFFF] shadow-2xl"
+              >
+                {/* user header */}
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.07]">
+                  <Avatar className="h-9 w-9 flex-shrink-0">
+                    <AvatarImage src={session.user?.image || ""} />
+                    <AvatarFallback className="bg-[#15202B] text-white text-sm font-bold">
+                      {userInitial}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-black truncate">
+                      {session.user?.name}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                      {session.user?.email}
+                    </p>
                   </div>
                 </div>
-                <DropdownMenuSeparator />
+
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
-                    <Link href="/saved-jobs" className="flex items-center cursor-pointer">
-                      <Bookmark className="mr-2 h-4 w-4" />
-                      <span>Saved Jobs</span>
+                    <Link
+                      href="/profile"
+                      className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-black rounded-lg cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-200 focus:text-black transition-colors"
+                    >
+                      <User className="h-4 w-4 text-gray-500" />
+                      Profile
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/settings" className="flex items-center cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
+                    <Link
+                      href="/saved-jobs"
+                      className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-black rounded-lg cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-200 focus:text-black transition-colors"
+                    >
+                      <Bookmark className="h-4 w-4 text-gray-500" />
+                      Saved Jobs
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/profile"
+                      className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-black rounded-lg cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-200 focus:text-black transition-colors"
+                    >
+                      <Settings className="h-4 w-4 text-gray-500" />
+                      Settings
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign Out</span>
+                <div className="mx-3 my-1.5 h-px bg-white/[0.07]" />
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-red-600 rounded-lg cursor-pointer hover:bg-red-500/10 hover:text-red-400 focus:bg-red-500/10 focus:text-red-400 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
           ) : (
             <div className="flex items-center gap-3">
               <Link href="/login">
-                <Button variant="ghost"
-                  className="px-4 py-1 bg-white rounded-full text-sm border border-black hover:bg-gray-100"
-                >Login</Button>
+                <Button
+                  variant="ghost"
+                  className="px-5 py-1.5 text-white rounded-full text-sm border border-white/20 hover:bg-white/10 hover:text-white"
+                >
+                  Login
+                </Button>
               </Link>
               <Link href="/register">
-                <Button className="px-4 py-1 bg-[#b8a8d8] rounded-full text-sm text-black border border-black hover:bg-[#a898c8]"
-                >
+                <Button className="px-5 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-0 hover:from-indigo-600 hover:to-violet-700">
                   Register
                 </Button>
               </Link>
@@ -163,33 +234,31 @@ export default function Navbar() {
           )}
         </div>
       </div>
-    </nav>
+    </nav >
   );
 }
 
 const ListItem = React.forwardRef<
   React.ElementRef<"a">,
   React.ComponentPropsWithoutRef<"a"> & { title: string }
->(({ className, title, children, href, ...props }, ref) => {
-  return (
-    <li>
-      <NavigationMenuLink asChild>
-        <Link
-          href={href!}
-          ref={ref as any}
-          className={cn(
-            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-            className
-          )}
-          {...props}
-        >
-          <div className="text-sm font-medium leading-none">{title}</div>
-          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-            {children}
-          </p>
-        </Link>
-      </NavigationMenuLink>
-    </li>
-  );
-});
+>(({ className, title, children, href, ...props }, ref) => (
+  <li>
+    <NavigationMenuLink asChild>
+      <Link
+        href={href!}
+        ref={ref as any}
+        className={cn(
+          "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+          className
+        )}
+        {...props}
+      >
+        <div className="text-sm font-medium leading-none">{title}</div>
+        <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+          {children}
+        </p>
+      </Link>
+    </NavigationMenuLink>
+  </li>
+));
 ListItem.displayName = "ListItem";

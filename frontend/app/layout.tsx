@@ -3,9 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import SessionProvider from "@/components/SessionProvider";
 import Footer from "@/components/Footer";
-import ConditionalLayout from "@/components/ConditionalLayout";
 import Navbar from "@/components/NavBar";
-
 
 const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
@@ -22,14 +20,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={inter.className}
+        className={`${inter.className} `}
       >
         <SessionProvider>
-          <Navbar/>
-           <ConditionalLayout>
-            {children}
-          </ConditionalLayout>
-          <Footer/>
+          <Navbar />
+          {children}
+          <Footer />
         </SessionProvider>
       </body>
     </html>

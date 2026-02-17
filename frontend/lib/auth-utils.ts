@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 
 export function useAuth() {
     const { data: session, status } = useSession();
@@ -9,6 +9,7 @@ export function useAuth() {
         isAuthenticated: status === "authenticated",
         isLoading: status === "loading",
         user: session?.user,
+        session,
     };
 }
 
@@ -20,4 +21,14 @@ export function useRequireAuth() {
         isLoading,
         user,
     };
+}
+
+export async function logout() {
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem('savedJobs');
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('userId');
+    }
+    
+    await signOut({ redirect: false, callbackUrl: '/' });
 }

@@ -1,7 +1,7 @@
 export interface Job {
   id: string;
   company: string;
-  title: string;
+  position: string;
   location: string | null;
   salary: string | null;
   type: JobType;
@@ -13,6 +13,7 @@ export interface Job {
   scrapedAt: Date | string;
   createdAt: Date | string;
   updatedAt: Date | string;
+  postedAt?: Date | string;
 }
 
 export type JobType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'INTERNSHIP';
@@ -26,6 +27,7 @@ export interface ApiResponse<T> {
 
 export interface PaginatedResponse<T> {
   data: T[];
+  job:Job[]; 
   pagination: {
     page: number;
     limit: number;

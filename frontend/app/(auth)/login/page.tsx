@@ -55,7 +55,6 @@ export default function LoginPage() {
                     </CardDescription>
                 </CardHeader>
 
-
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-4 py-4">
                         {error && (
