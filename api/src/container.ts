@@ -5,11 +5,10 @@ import { JobController } from './controllers/job.controller';
 import { StatsController } from './controllers/stats.controller';
 import { JobService } from './services/job.svc';
 import chalk from 'chalk';
-import { CacheService } from './cache/store';
+import { CacheService } from './cache';
 import { AuthController } from './controllers/auth.controller';
 import { AdminController } from './controllers/admin.controller';
 import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
 import { db } from './lib/prisma';
 
 export class Container {
@@ -52,7 +51,7 @@ export class Container {
 
     this._db = db;
 
-    this._cache = new CacheService(this);
+    this._cache = new CacheService();
     this._jobService = new JobService(this, this._cache);
     this._jobController = new JobController(this._jobService);
     this._statsController = new StatsController(this._jobService);

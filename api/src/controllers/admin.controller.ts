@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { Container } from '../container';
-import { ScraperManager } from '../scrapers/manager';
 import chalk from 'chalk';
 import { ApiResponse } from '../types';
+import { ScraperManager } from 'src/scrape';
 
 export class AdminController {
   constructor(private container: Container) {}
@@ -13,7 +13,6 @@ export class AdminController {
 
       console.log(chalk.blue('🚀 Manual scrape triggered...'));
 
-      // Fixed: Pass all required arguments (container, cache, jobService)
       const manager = new ScraperManager(
         this.container,
         this.container.cache,

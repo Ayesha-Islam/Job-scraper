@@ -66,11 +66,12 @@ export interface ScrapedJob {
   position: string;
   company: string;
   location: string;
-  salary: string;
+  salary: string | null;
   type: PrismaJobType;
   url: string;
   source: string;
   description: string;
+  postedAt: Date | string | null;
 }
 
 export interface LoginCredentials {
@@ -126,8 +127,10 @@ export interface CacheConfig {
 }
 
 export interface ScraperConfig {
-  enabled: boolean;
-  interval: number;
-  timeout: number;
+  name: string;
+  url: string;
   maxRetries: number;
+  timeout: number;
+  useClaudeAPI: boolean;
+  useBrowser?: boolean;
 }

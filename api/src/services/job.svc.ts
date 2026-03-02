@@ -3,13 +3,104 @@ import { Job, JobType, JobFilters, PaginatedResponse, JobStats } from '../types'
 import { createHash } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import chalk from 'chalk';
-import { CacheService } from '../cache/store';
+import { CacheService } from '../cache';
+
+const DEBUG = process.env.DEBUG === 'true';
 
 export class JobService {
     constructor(
         private container: Container,
         private cache: CacheService
     ) { }
+
+    private validateJobData(job: Prisma.JobCreateInput): boolean {
+        if (!job.position || typeof job.position !== 'string' || job.position.trim() === '') {
+            if (DEBUG) console.log(chalk.yellow(`   ⚠️  Skipping job: Missing or invalid position`));
+            return false;
+        }
+
+        if (!job.company || typeof job.company !== 'string' || job.company.trim() === '') {
+            if (DEBUG) console.log(chalk.yellow(`   ⚠️  Skipping job: Missing or invalid company for position "${job.position}"`));
+            return false;
+        }
+
+        if (!job.url || typeof job.url !== 'string' || job.url.trim() === '') {
+            if (DEBUG) console.log(chalk.yellow(`   ⚠️  Skipping job: Missing or invalid URL for position "${job.position}"`));
+            return false;
+        }
+
+        if (!job.source || typeof job.source !== 'string' || job.source.trim() === '') {
+            if (DEBUG) console.log(chalk.yellow(`   ⚠️  Skipping job: Missing or invalid source for position "${job.position}"`));
+            return false;
+        }
+
+        if (!job.type || typeof job.type !== 'string') {
+            if (DEBUG) console.log(chalk.yellow(`   ⚠️  Skipping job: Missing or invalid type for position "${job.position}"`));
+            return false;
+        }
+
+        const invalidPositions = [
+            'view company profile',
+            'view profile',
+            'apply now',
+            'learn more',
+            'see more',
+            'view job',
+            'view details',
+            'company profile',
+            'read more',
+            'more info',
+            'click here',
+        ];
+
+        const positionLower = job.position.toLowerCase().trim();
+        if (invalidPositions.includes(positionLower)) {
+            console.log(chalk.yellow(`   ⚠️  Skipping invalid position: "${job.position}"`));
+            return false;
+        }
+
+        if (job.position.trim().length < 3) {
+            console.log(chalk.yellow(`   ⚠️  Skipping suspiciously short position: "${job.position}"`));
+            return false;
+        }
+
+        if (job.position.includes('<') || job.position.includes('>')) {
+            console.log(chalk.yellow(`   ⚠️  Skipping position with HTML tags: "${job.position}"`));
+            return false;
+        }
+
+        if (job.company.includes('<') || job.company.includes('>')) {
+            console.log(chalk.yellow(`   ⚠️  Skipping company with HTML tags: "${job.company}"`));
+            return false;
+        }
+
+        try {
+            new URL(job.url);
+        } catch {
+            console.log(chalk.yellow(`   ⚠️  Skipping invalid URL format: "${job.url}"`));
+            return false;
+        }
+
+        return true;
+    }
+
+    private normalizeJobData(job: Prisma.JobCreateInput): Prisma.JobCreateInput {
+        return {
+            position: job.position.trim(),
+            company: job.company.trim(),
+            location: job.location?.trim() || null,
+            salary: (() => {
+                const s = job.salary?.trim();
+                return (s && /[\d$\u20ac\u00a3\u00a5\u20b9]/.test(s)) ? s : null;
+            })(),
+            type: job.type,
+            url: job.url.trim(),
+            source: job.source.trim(),
+            description: job.description?.trim() || null,
+            hash: job.hash,
+            ...(job.postedAt ? { postedAt: job.postedAt } : {}),
+        };
+    }
 
     async getJobs(
         page: number = 1,
@@ -113,8 +204,6 @@ export class JobService {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-
-
         const [total, addedToday, bySource, byType] = await Promise.all([
             this.container.db.job.count({ where: { isActive: true } }),
             this.container.db.job.count({
@@ -152,55 +241,90 @@ export class JobService {
         return stats;
     }
 
-    async saveJobs(jobs: Prisma.JobCreateInput[]): Promise<{ added: number; duplicates: number; }> {
+    async saveJobs(jobs: Prisma.JobCreateInput[]): Promise<{
+        added: number;
+        duplicates: number;
+        skipped: number;
+    }> {
         let added = 0;
         let duplicates = 0;
+        let skipped = 0;
 
-        for (const job of jobs) {
+        const validJobs = jobs.filter(job => {
+            const isValid = this.validateJobData(job);
+            if (!isValid) skipped++;
+            return isValid;
+        });
+
+        if (validJobs.length === 0) {
+            console.log(chalk.yellow('   ⚠️  No valid jobs to save after filtering'));
+            return { added: 0, duplicates: 0, skipped };
+        }
+
+        console.log(chalk.cyan(`   📝 Saving ${validJobs.length} validated jobs (${skipped} skipped)...`));
+
+        for (const job of validJobs) {
             try {
-                const hash = createHash('md5')
-                    .update(`${job.url.toLowerCase()}:${job.position.toLowerCase()}`)
+                const normalizedJob = this.normalizeJobData(job);
+
+                const hash = (normalizedJob.hash as string) || createHash('md5')
+                    .update(`${normalizedJob.url.toLowerCase()}:${normalizedJob.position.toLowerCase()}`)
                     .digest('hex');
 
-                const result = await this.container.db.job.upsert({
-                    where: { url: job.url },
-                    update: {
-                        position: job.position,
-                        company: job.company,
-                        location: job.location,
-                        salary: job.salary,
-                        type: job.type,
-                        description: job.description,
-                        hash: hash,
-                        isActive: true,
-                        scrapedAt: new Date(),
-                        updatedAt: new Date(),
-                    },
-                    create: {
-                        ...job,
-                        hash: hash,
-                        isActive: true,
-                        scrapedAt: new Date(),
-                    }
+                const existing = await this.container.db.job.findUnique({
+                    where: { hash },
+                    select: { id: true },
                 });
 
-                const isNew = Math.abs(result.updatedAt.getTime() - result.createdAt.getTime()) < 1000;
-                if (isNew) {
-                    added++;
-                } else {
+                if (existing) {
+                    await this.container.db.job.update({
+                        where: { hash },
+                        data: {
+                            position: normalizedJob.position,
+                            company: normalizedJob.company,
+                            location: normalizedJob.location,
+                            salary: normalizedJob.salary,
+                            type: normalizedJob.type,
+                            description: normalizedJob.description,
+                            url: normalizedJob.url,   // keep url in sync
+                            isActive: true,
+                            scrapedAt: new Date(),
+                            ...(normalizedJob.postedAt ? { postedAt: normalizedJob.postedAt } : {}),
+                        },
+                    });
                     duplicates++;
+                } else {
+                    await this.container.db.job.create({
+                        data: {
+                            ...normalizedJob,
+                            hash,
+                            isActive: true,
+                            scrapedAt: new Date(),
+                        },
+                    });
+                    added++;
+                    if (DEBUG) {
+                        console.log(chalk.green(`   ✓ Added: ${normalizedJob.position} at ${normalizedJob.company}`));
+                    }
                 }
-            } catch (error) {
-                console.error(`   ❌ Failed to save job: ${job.position}`, error);
-                duplicates++;
+            } catch (error: any) {
+                if (error?.code === 'P2002') {
+                    console.warn(chalk.yellow(`   ⚠️  Duplicate constraint for: ${job.position} — counting as duplicate`));
+                    duplicates++;
+                } else {
+                    console.error(chalk.red(`   ❌ Failed to save job: ${job.position}`));
+                    if (DEBUG) console.error(error);
+                    skipped++;
+                }
             }
         }
 
         if (added > 0) {
             await this.cache.deletePattern('stats:*');
-            console.log(chalk.gray('   🔄 Stats cache invalidated'));
+            if (DEBUG) console.log(chalk.gray('   🔄 Stats cache invalidated'));
         }
-        return { added, duplicates };
+
+        return { added, duplicates, skipped };
     }
 
     async invalidateCaches(): Promise<void> {

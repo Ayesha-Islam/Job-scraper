@@ -11,7 +11,9 @@ const app: Express = express();
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'development'
+    ? true
+    : process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
 }));
 app.use(compression());

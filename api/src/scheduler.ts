@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { Container } from './container';
-import { ScraperManager } from './scrapers/manager';
+import { ScraperManager } from './scrape'; 
 import chalk from 'chalk';
 
 let isRunning = false;

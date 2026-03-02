@@ -27,16 +27,15 @@ model Job {
   type        JobType  @default(FULL_TIME)
   url         String   @unique
   source      String
-  description String?  @db.Text
+  description String?  @default("")
   hash        String   @unique
+  postedAt    DateTime @default(now())
   isActive    Boolean  @default(true)
   scrapedAt   DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([company])
-  @@index([location])
-  @@index([type])
+ 
   @@index([source])
   @@index([hash])
   @@index([createdAt])
