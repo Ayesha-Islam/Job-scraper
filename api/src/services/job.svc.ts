@@ -329,9 +329,6 @@ export class JobService {
         return stats;
     }
 
-    /**
-     * Clean up existing bad descriptions in database
-     */
     async cleanupBadDescriptions(): Promise<{ updated: number; cleared: number }> {
         console.log(chalk.cyan('\n   🧹 Cleaning up bad descriptions in database...\n'));
 
@@ -366,9 +363,7 @@ export class JobService {
         return { updated, cleared };
     }
 
-    /**
-     * Save jobs with validation, description cleaning, and DB retry on connection drops
-     */
+  
     async saveJobs(jobs: Prisma.JobCreateInput[]): Promise<{
         added: number;
         duplicates: number;
