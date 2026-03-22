@@ -13,6 +13,98 @@ export class JobService {
         private cache: CacheService
     ) { }
 
+    private async withDbRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+        for (let i = 0; i < retries; i++) {
+            try {
+                return await fn();
+            } catch (err: any) {
+                const isConnErr =
+                    err?.message?.includes('Failed to connect') ||
+                    err?.message?.includes('connection') ||
+                    err?.message?.includes('ECONNRESET') ||
+                    err?.message?.includes('ETIMEDOUT');
+
+                if (isConnErr && i < retries - 1) {
+                    const wait = 2000 * (i + 1);
+                    console.warn(chalk.yellow(`   ⚠️  DB connection lost — reconnecting in ${wait / 1000}s (attempt ${i + 1}/${retries - 1})...`));
+                    await new Promise(r => setTimeout(r, wait));
+                    try { await this.container.db.$connect(); } catch { /* ignore if already connected */ }
+                    continue;
+                }
+                throw err;
+            }
+        }
+        throw new Error('DB retries exhausted');
+    }
+
+    private removeEmoji(text: string): string {
+        if (!text) return '';
+        return text
+            .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, ' ')
+            .replace(/[\u{1F300}-\u{1F9FF}]/gu, ' ')
+            .replace(/[\u{2600}-\u{27BF}]/gu, ' ')
+            .replace(/[\u{2300}-\u{23FF}]/gu, ' ')
+            .replace(/[\u{1F004}-\u{1F0CF}]/gu, ' ')
+            .replace(/  +/g, ' ')
+            .trim();
+    }
+
+    private isValidJobDescription(description: string | null | undefined): boolean {
+        if (!description) return false;
+
+        const cleaned = this.removeEmoji(description).trim();
+
+        if (cleaned.length < 80) {
+            if (DEBUG) console.log(chalk.gray(`     ⚠️  Description too short (${cleaned.length} chars)`));
+            return false;
+        }
+
+        const pureNavStart = /^(log in|frontpage|dark mode|general\s+frontpage|join\s+remote\s+ok|join\s+log\s+in|sign up\s+to|create account|forgot password|please\s+(enable|accept)|cookie\s+(policy|notice)|hire remote workers\s+post|learn the skills employers|enhance your skills with courses)/i;
+        if (pureNavStart.test(cleaned)) {
+            if (DEBUG) console.log(chalk.gray(`     ⚠️  Description looks like metadata/nav`));
+            return false;
+        }
+
+        const jobKeywords = /role|responsibilit|requirement|qualif|experience|skill|candidate|position|engineer|developer|designer|manager|team|project|work|what you|what we|about the role|must have|you will|we are looking|we're looking|join our|join us|salary|compensation|benefit|remote/i;
+        if (!jobKeywords.test(cleaned)) {
+            if (DEBUG) console.log(chalk.gray(`     ⚠️  No job keywords found`));
+            return false;
+        }
+
+        const words = cleaned.split(/\s+/).filter(w => w.length > 0);
+        if (words.length < 20) {
+            if (DEBUG) console.log(chalk.gray(`     ⚠️  Not enough words (${words.length})`));
+            return false;
+        }
+
+        const avgWordLength = words.reduce((sum, w) => sum + w.length, 0) / words.length;
+        if (avgWordLength < 3) {
+            if (DEBUG) console.log(chalk.gray(`     ⚠️  Average word length too short (${avgWordLength.toFixed(1)})`));
+            return false;
+        }
+
+        return true;
+    }
+
+    private cleanDescription(description: string | null | undefined): string | null {
+        if (!description) return null;
+
+        let cleaned = this.removeEmoji(description).trim();
+        if (!cleaned) return null;
+
+        cleaned = cleaned
+            .replace(/[ \t]+/g, ' ')      
+            .replace(/\n{3,}/g, '\n\n')    
+            .trim();
+
+        if (this.isValidJobDescription(cleaned)) {
+            return cleaned;
+        }
+
+        if (DEBUG) console.log(chalk.gray(`     ⚠️  Description failed validation after cleaning`));
+        return null;
+    }
+
     private validateJobData(job: Prisma.JobCreateInput): boolean {
         if (!job.position || typeof job.position !== 'string' || job.position.trim() === '') {
             if (DEBUG) console.log(chalk.yellow(`   ⚠️  Skipping job: Missing or invalid position`));
@@ -209,18 +301,14 @@ export class JobService {
             this.container.db.job.count({
                 where: {
                     isActive: true,
-                    createdAt: {
-                        gte: today,
-                    },
+                    createdAt: { gte: today },
                 },
             }),
-
             this.container.db.job.groupBy({
                 by: ['source'],
                 where: { isActive: true },
                 _count: { source: true },
             }),
-
             this.container.db.job.groupBy({
                 by: ['type'],
                 where: { isActive: true },
@@ -241,14 +329,56 @@ export class JobService {
         return stats;
     }
 
+    /**
+     * Clean up existing bad descriptions in database
+     */
+    async cleanupBadDescriptions(): Promise<{ updated: number; cleared: number }> {
+        console.log(chalk.cyan('\n   🧹 Cleaning up bad descriptions in database...\n'));
+
+        const allJobs = await this.container.db.job.findMany({
+            where: { isActive: true },
+            select: { id: true, position: true, description: true },
+        });
+
+        let updated = 0;
+        let cleared = 0;
+
+        for (const job of allJobs) {
+            if (!job.description) continue;
+
+            const isBad = !this.isValidJobDescription(job.description);
+            const hasEmoji = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u.test(job.description);
+            const hasMetadata = /^(log in|frontpage|dark mode|join remote ok|learn the skills employers)/i.test(job.description.trim());
+
+            if (isBad || hasEmoji || hasMetadata) {
+                await this.withDbRetry(() =>
+                    this.container.db.job.update({
+                        where: { id: job.id },
+                        data: { description: null },
+                    })
+                );
+                cleared++;
+                console.log(chalk.gray(`     ✗ Cleared: ${job.position} (${job.description.substring(0, 50)}...)`));
+            }
+        }
+
+        console.log(chalk.green(`\n   ✅ Cleanup complete: ${cleared} bad descriptions cleared\n`));
+        return { updated, cleared };
+    }
+
+    /**
+     * Save jobs with validation, description cleaning, and DB retry on connection drops
+     */
     async saveJobs(jobs: Prisma.JobCreateInput[]): Promise<{
         added: number;
         duplicates: number;
         skipped: number;
+        descriptionUpdated: number;
     }> {
         let added = 0;
         let duplicates = 0;
         let skipped = 0;
+        let descriptionUpdated = 0;
 
         const validJobs = jobs.filter(job => {
             const isValid = this.validateJobData(job);
@@ -258,7 +388,7 @@ export class JobService {
 
         if (validJobs.length === 0) {
             console.log(chalk.yellow('   ⚠️  No valid jobs to save after filtering'));
-            return { added: 0, duplicates: 0, skipped };
+            return { added: 0, duplicates: 0, skipped, descriptionUpdated: 0 };
         }
 
         console.log(chalk.cyan(`   📝 Saving ${validJobs.length} validated jobs (${skipped} skipped)...`));
@@ -267,64 +397,92 @@ export class JobService {
             try {
                 const normalizedJob = this.normalizeJobData(job);
 
+                const cleanedDescription = this.cleanDescription(normalizedJob.description);
+
+                if (!cleanedDescription) {
+                    if (DEBUG) console.log(chalk.gray(`   ⏭  Skipping (no valid description): ${normalizedJob.position} at ${normalizedJob.company}`));
+                    skipped++;
+                    continue;
+                }
+
                 const hash = (normalizedJob.hash as string) || createHash('md5')
                     .update(`${normalizedJob.url.toLowerCase()}:${normalizedJob.position.toLowerCase()}`)
                     .digest('hex');
 
-                const existing = await this.container.db.job.findUnique({
-                    where: { hash },
-                    select: { id: true },
-                });
+                const existingByUrl = await this.withDbRetry(() =>
+                    this.container.db.job.findFirst({
+                        where: { url: normalizedJob.url },
+                        select: { id: true, description: true },
+                    })
+                );
 
-                if (existing) {
-                    await this.container.db.job.update({
-                        where: { hash },
-                        data: {
-                            position: normalizedJob.position,
-                            company: normalizedJob.company,
-                            location: normalizedJob.location,
-                            salary: normalizedJob.salary,
-                            type: normalizedJob.type,
-                            description: normalizedJob.description,
-                            url: normalizedJob.url,   // keep url in sync
-                            isActive: true,
-                            scrapedAt: new Date(),
-                            ...(normalizedJob.postedAt ? { postedAt: normalizedJob.postedAt } : {}),
-                        },
-                    });
-                    duplicates++;
-                } else {
-                    await this.container.db.job.create({
-                        data: {
-                            ...normalizedJob,
-                            hash,
-                            isActive: true,
-                            scrapedAt: new Date(),
-                        },
-                    });
-                    added++;
-                    if (DEBUG) {
-                        console.log(chalk.green(`   ✓ Added: ${normalizedJob.position} at ${normalizedJob.company}`));
+                if (existingByUrl) {
+                    const updateData: any = {
+                        position: normalizedJob.position,
+                        company: normalizedJob.company,
+                        location: normalizedJob.location,
+                        salary: normalizedJob.salary,
+                        type: normalizedJob.type,
+                        isActive: true,
+                        scrapedAt: new Date(),
+                        hash,
+                        description: cleanedDescription,
+                        ...(normalizedJob.postedAt ? { postedAt: normalizedJob.postedAt } : {}),
+                    };
+
+                    if (existingByUrl.description !== cleanedDescription) {
+                        descriptionUpdated++;
+                        if (DEBUG) console.log(chalk.blue(`     ↻ Updated description: ${normalizedJob.position}`));
                     }
-                }
-            } catch (error: any) {
-                if (error?.code === 'P2002') {
-                    console.warn(chalk.yellow(`   ⚠️  Duplicate constraint for: ${job.position} — counting as duplicate`));
+
+                    await this.withDbRetry(() =>
+                        this.container.db.job.update({
+                            where: { id: existingByUrl.id },
+                            data: updateData,
+                        })
+                    );
                     duplicates++;
+                    if (DEBUG) console.log(chalk.gray(`   ↻ Updated: ${normalizedJob.position} at ${normalizedJob.company}`));
+
                 } else {
-                    console.error(chalk.red(`   ❌ Failed to save job: ${job.position}`));
-                    if (DEBUG) console.error(error);
-                    skipped++;
+                    await this.withDbRetry(() =>
+                        this.container.db.job.create({
+                            data: {
+                                position: normalizedJob.position,
+                                company: normalizedJob.company,
+                                location: normalizedJob.location,
+                                salary: normalizedJob.salary,
+                                type: normalizedJob.type,
+                                url: normalizedJob.url,
+                                source: normalizedJob.source,
+                                description: cleanedDescription,
+                                hash,
+                                isActive: true,
+                                scrapedAt: new Date(),
+                                ...(normalizedJob.postedAt ? { postedAt: normalizedJob.postedAt } : {}),
+                            },
+                        })
+                    );
+                    added++;
+                    if (DEBUG) console.log(chalk.green(`   ✓ Added: ${normalizedJob.position} at ${normalizedJob.company}`));
                 }
+
+            } catch (error: any) {
+                console.error(chalk.red(`   ❌ Error saving job: ${job.position}`));
+                if (error?.code === 'P2002') {
+                    console.warn(chalk.yellow(`   ⚠️  Unique constraint violation for: ${job.position}`));
+                }
+                if (DEBUG) console.error(error);
+                skipped++;
             }
         }
 
-        if (added > 0) {
+        if (added > 0 || descriptionUpdated > 0) {
             await this.cache.deletePattern('stats:*');
             if (DEBUG) console.log(chalk.gray('   🔄 Stats cache invalidated'));
         }
 
-        return { added, duplicates, skipped };
+        return { added, duplicates, skipped, descriptionUpdated };
     }
 
     async invalidateCaches(): Promise<void> {

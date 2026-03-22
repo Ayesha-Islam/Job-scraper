@@ -107,7 +107,7 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
             </div>
 
             {job.description && (
-              <p className="text-sm text-gray-700 line-clamp-2 leading-relaxed">
+              <p className="text-sm text-white line-clamp-2 leading-relaxed">
                 {job.description}
               </p>
             )}

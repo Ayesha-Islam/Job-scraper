@@ -73,7 +73,6 @@ export interface ScraperResult {
   filtered: number;
 }
 
-
 export interface ScrapeRunResult {
   source: string;
   jobsFound: number;
@@ -85,7 +84,6 @@ export interface ScrapeRunResult {
   duration: number;
 }
 
-
 const US_STATES = new Set([
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
   'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
@@ -95,51 +93,39 @@ const US_STATES = new Set([
 ]);
 
 const NON_US_COUNTRIES = [
-  // UK / British Isles
   'united kingdom', ' uk ', 'england', 'london', 'scotland', 'wales',
   'ireland', 'dublin', 'cork',
-  // Canada
   'canada', 'toronto', 'vancouver', 'montreal', 'ontario', 'alberta',
   'british columbia', 'quebec', 'calgary', 'ottawa',
-  // Australia / NZ
   'australia', 'sydney', 'melbourne', 'brisbane', 'perth', 'adelaide',
   'new zealand', 'auckland',
-  // India
   'india', 'bangalore', 'bengaluru', 'hyderabad', 'mumbai', 'delhi', 'pune', 'chennai',
-  // Europe — countries
   'germany', 'france', 'netherlands', 'spain', 'italy', 'poland',
   'ukraine', 'romania', 'sweden', 'norway', 'denmark', 'finland',
   'switzerland', 'austria', 'belgium', 'portugal', 'czech republic',
   'hungary', 'greece', 'croatia', 'serbia', 'bulgaria', 'slovakia',
   'slovenia', 'estonia', 'latvia', 'lithuania', 'luxembourg',
-  // European cities
   'berlin', 'munich', 'frankfurt', 'hamburg', 'paris', 'lyon', 'marseille',
   'amsterdam', 'rotterdam', 'madrid', 'barcelona', 'rome', 'milan',
   'warsaw', 'krakow', 'kyiv', 'kharkiv', 'bucharest', 'stockholm',
   'oslo', 'copenhagen', 'helsinki', 'zurich', 'geneva', 'vienna',
   'brussels', 'lisbon', 'prague', 'budapest',
-  // Latin America
   'brazil', 'são paulo', 'sao paulo', 'rio de janeiro',
   'mexico city', 'ciudad de mexico', 'guadalajara', 'monterrey',
   'argentina', 'buenos aires', 'colombia', 'bogota', 'chile', 'santiago',
   'peru', 'lima', 'venezuela', 'caracas',
-  // Asia
   'singapore', 'hong kong', 'japan', 'tokyo', 'osaka',
   'china', 'beijing', 'shanghai', 'shenzhen',
   'south korea', 'seoul', 'taiwan', 'taipei',
   'indonesia', 'jakarta', 'malaysia', 'kuala lumpur', 'thailand', 'bangkok',
   'vietnam', 'philippines', 'manila', 'pakistan', 'karachi', 'lahore',
   'bangladesh', 'dhaka', 'sri lanka',
-  // Middle East
   'israel', 'tel aviv', 'dubai', 'uae', 'abu dhabi', 'saudi arabia',
   'riyadh', 'qatar', 'doha', 'turkey', 'istanbul', 'ankara',
-  // Africa
   'south africa', 'johannesburg', 'cape town', 'nigeria', 'lagos',
   'kenya', 'nairobi', 'egypt', 'cairo', 'ghana', 'accra', 'ethiopia',
-  // Region-level labels (NoDesk, Remotive etc. use these)
   'europe', 'africa', 'asia', 'oceania', 'latin america', 'south america',
   'emea', 'apac', 'non-us', 'non us',
-  // Explicit exclusion labels
   'eu only', 'europe only', 'emea only', 'outside us', 'non-us only',
 ];
 
@@ -165,9 +151,7 @@ export function isUSOrRemoteJob(location: string, description = ''): boolean {
   }
 
   if (NON_US_COUNTRIES.some(c => {
-    if (c.length <= 3) {
-      return new RegExp(`\\b${c}\\b`, 'i').test(loc);
-    }
+    if (c.length <= 3) return new RegExp(`\\b${c}\\b`, 'i').test(loc);
     return loc.includes(c);
   })) return false;
 
@@ -194,6 +178,59 @@ export function cleanHtml(raw: string): string {
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+export function cleanDescription(text: string): string {
+  if (!text) return '';
+
+  const NOISE_LINE_PATTERNS: RegExp[] = [
+    /^people also viewed$/i,
+    /^similar jobs$/i,
+    /^you may also like$/i,
+    /^related jobs$/i,
+    /^recommended jobs$/i,
+    /^more jobs like this$/i,
+    /^other jobs at .+/i,
+    /^jobs at this company$/i,
+    /^company profile$/i,
+    /^apply now$/i,
+    /^apply for this job$/i,
+    /^save job$/i,
+    /^email this job$/i,
+    /^share this job$/i,
+    /^report this job$/i,
+    /^follow company$/i,
+    /^get job alerts$/i,
+    /^create (a )?job alert$/i,
+    /^sign up.{0,30}job alerts/i,
+    /^please let .+ know you found/i,
+    /^support us so we can keep/i,
+    /^promoted$/i,
+    /^sponsored$/i,
+    /^advertisement$/i,
+    /^about the advertiser$/i,
+    /^learn the skills employers are hiring for/i,
+    /^enhance your skills with courses/i,
+    /^join remote ok/i,
+    /^log in general frontpage/i,
+    /^\s*cookie\s*(policy|notice|consent)\s*$/i,
+    /^privacy policy$/i,
+  ];
+
+  const lines = text.split('\n');
+  const cutIndex = lines.findIndex(line => {
+    const trimmed = line.trim();
+    return trimmed.length > 0 && NOISE_LINE_PATTERNS.some(re => re.test(trimmed));
+  });
+
+  const kept = cutIndex !== -1 ? lines.slice(0, cutIndex) : lines;
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function isLikelyRealDescription(text: string): boolean {
+  if (!text || text.trim().length < 80) return false;
+  if (/^(join remote ok|log in general frontpage|learn the skills employers|enhance your skills with courses|frontpage|dark mode|hire remote workers)/i.test(text.trim())) return false;
+  return /role|responsibilit|requirement|qualif|experience|engineer|developer|designer|manager|team|we (are|offer|look)|you will|what you/i.test(text);
 }
 
 function inferJobType(text: string): ScraperJobType {
@@ -267,18 +304,7 @@ function parseSalaryRange(salary: string): { min?: number; max?: number } {
 function cleanSalary(raw: string): string {
   if (!raw) return '';
   const cleaned = raw.replace(/\s+/g, ' ').replace(/\n/g, ' ').trim();
-
-  // ── Salary validation ─────────────────────────────────────────────────
-  // ROOT CAUSE of 'Remote' appearing in salary column:
-  // The Remotive API returns post.salary = 'Remote' / 'Anywhere' / 'USA Only'
-  // when no compensation is listed — it reuses the location string as a
-  // salary fallback. cleanSalary had no validation so these passed straight
-  // through into the DB.
-  //
-  // Rule: a valid salary MUST contain at least one digit or currency symbol.
-  // Strings like 'Remote', 'Anywhere', 'Worldwide', 'USA Only' have none.
   if (!/[\d$\u20ac\u00a3\u00a5\u20b9]/.test(cleaned)) return '';
-
   return cleaned;
 }
 
@@ -319,7 +345,6 @@ export function standardizePostedDate(raw: string | undefined, fallback: Date = 
   return fallback.toISOString();
 }
 
-
 function buildJob(raw: {
   title: string;
   company: string;
@@ -337,7 +362,7 @@ function buildJob(raw: {
   const company = cleanHtml(raw.company).trim();
   if (!title || !company || !raw.url) return null;
 
-  const description = cleanHtml(raw.description || '');
+  const description = cleanDescription(cleanHtml(raw.description || ''));
   const salary = cleanSalary(raw.salary || '');
   const { min: salaryMin, max: salaryMax } = parseSalaryRange(salary);
   const fullText = `${title} ${raw.jobType || ''} ${description}`;
@@ -378,7 +403,6 @@ function toPrismaJobType(t: ScraperJobType): 'FULL_TIME' | 'PART_TIME' | 'CONTRA
     case 'PART_TIME': return 'PART_TIME';
     case 'CONTRACT': return 'CONTRACT';
     case 'INTERNSHIP': return 'INTERNSHIP';
-
     default: return 'FULL_TIME';
   }
 }
@@ -400,11 +424,7 @@ export function toDbJob(job: Job): Prisma.JobCreateInput {
     position: job.title,
     company: job.company,
     location: job.location || null,
-    // Second defence: null out salary if it somehow still contains no digits/currency
-    // (guards against any scraper that bypasses cleanSalary)
-    salary: (job.salary && /[\d$\u20ac\u00a3\u00a5\u20b9]/.test(job.salary))
-      ? job.salary
-      : null,
+    salary: (job.salary && /[\d$\u20ac\u00a3\u00a5\u20b9]/.test(job.salary)) ? job.salary : null,
     type: toPrismaJobType(job.jobType),
     url: job.url,
     source: job.source,
@@ -465,7 +485,6 @@ abstract class JobBoardScraper {
       Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
     });
 
-    // Block images/fonts/media for speed
     await page.setRequestInterception(true);
     page.on('request', req => {
       const rt = req.resourceType();
@@ -498,7 +517,6 @@ abstract class JobBoardScraper {
   }
 }
 
-
 export class WeWorkRemotelyScraper extends JobBoardScraper {
   async scrape(query: string, _pages = 2): Promise<ScraperResult> {
     const t0 = Date.now(); const jobs: Job[] = []; const errors: string[] = []; const fc = { n: 0 };
@@ -528,9 +546,16 @@ export class WeWorkRemotelyScraper extends JobBoardScraper {
           const company = colonIdx > -1 ? rawTitle.substring(0, colonIdx).trim() : '';
           const title = colonIdx > -1 ? rawTitle.substring(colonIdx + 2).trim() : rawTitle;
           const jobUrl = $el.find('guid').text().trim() || $el.children('link').text().trim() || '';
-          const description = cleanHtml($el.find('description').text());
           const postedDate = $el.find('pubDate').text().trim();
           const region = $el.find('region').text().trim() || 'Remote, USA';
+
+          // FIX: parse CDATA as HTML, target only the real job body
+          const rawCdata = $el.find('description').text();
+          const $inner = cheerio.load(rawCdata);
+          const listingHtml = $inner('.listing-container').html()
+            || $inner('[class*="listing"]').html()
+            || rawCdata;
+          const description = cleanDescription(cleanHtml(listingHtml));
 
           if (query && !title.toLowerCase().includes(query.toLowerCase()) &&
             !description.toLowerCase().includes(query.toLowerCase())) return;
@@ -578,7 +603,10 @@ export class RemoteOKScraper extends JobBoardScraper {
           const tags = $el.find('.tags a').map((_, t) => $(t).text().trim()).get();
           const logo = $el.find('img.logo').attr('src') || '';
           const postedDate = $el.find('td.time time').attr('datetime') || '';
-          this.pushIfValid(jobs, buildJob({ title, company, location, salary, url: jobUrl, source: 'RemoteOK', postedDate, categories: tags, companyLogo: logo }), fc);
+          // FIX: try to grab inline expanded-row description
+          const descHtml = $el.find('.expanded td').html() || '';
+          const description = descHtml ? cleanDescription(cleanHtml(descHtml)) : '';
+          this.pushIfValid(jobs, buildJob({ title, company, location, salary, description, url: jobUrl, source: 'RemoteOK', postedDate, categories: tags, companyLogo: logo }), fc);
         });
         console.log(chalk.gray(`     → page ${p}: kept=${jobs.length} filtered=${fc.n}`));
       }
@@ -605,9 +633,7 @@ export class RemotiveScraper extends JobBoardScraper {
       }
 
       let apiData: any;
-      try {
-        apiData = JSON.parse(rawText);
-      } catch {
+      try { apiData = JSON.parse(rawText); } catch {
         errors.push('[Remotive] Failed to parse API JSON response');
         return { source: 'Remotive', jobs, scrapedAt: new Date().toISOString(), durationMs: Date.now() - t0, errors, filtered: fc.n };
       }
@@ -638,79 +664,6 @@ export class RemotiveScraper extends JobBoardScraper {
   }
 }
 
-export class WorkingNomadsScraper extends JobBoardScraper {
-  async scrape(query: string, pages = 2): Promise<ScraperResult> {
-    const t0 = Date.now(); const jobs: Job[] = []; const errors: string[] = []; const fc = { n: 0 };
-    await this.initialize();
-    const page = await this.createPage();
-    try {
-      // Strategy A: JSON API endpoint (preferred — selector-free)
-      const apiUrl = `https://www.workingnomads.co/api/exposed_jobs/?search=${encodeURIComponent(query)}&region=north-america`;
-      console.log(chalk.dim(`  [WorkingNomads] API → ${apiUrl}`));
-      await page.goto(apiUrl, { waitUntil: 'domcontentloaded', timeout: this.config.timeout });
-      await this.sleep(800);
-
-      let usedApi = false;
-      try {
-        const rawText = await page.evaluate(() => document.body.innerText);
-        const apiData = JSON.parse(rawText);
-        const postings: any[] = Array.isArray(apiData) ? apiData : (apiData.results || []);
-        if (postings.length > 0) {
-          usedApi = true;
-          console.log(chalk.dim(`  [WorkingNomads] API returned ${postings.length} jobs`));
-          for (const post of postings) {
-            this.pushIfValid(jobs, buildJob({
-              title: post.title || post.job_title || '',
-              company: post.company || post.company_name || '',
-              location: post.region || post.location || 'Remote',
-              salary: post.salary || '',
-              url: post.url || (post.id ? `https://www.workingnomads.co/jobs?jobId=${post.id}` : ''),
-              source: 'Working Nomads',
-              postedDate: post.pub_date || post.created_at || '',
-              categories: post.category ? [post.category] : [],
-            }), fc);
-          }
-          console.log(chalk.gray(`     → kept=${jobs.length} filtered=${fc.n}`));
-        }
-      } catch { /* API failed or returned non-JSON — fall through to HTML */ }
-
-      // Strategy B: HTML scraping if API yielded nothing
-      if (!usedApi || jobs.length === 0) {
-        console.log(chalk.dim(`  [WorkingNomads] falling back to HTML scraping`));
-        for (let p = 1; p <= pages; p++) {
-          const url = `https://www.workingnomads.co/jobs?search=${encodeURIComponent(query)}&region=north-america&page=${p}`;
-          console.log(chalk.dim(`  [WorkingNomads] page ${p} → ${url}`));
-          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: this.config.timeout });
-          await this.sleep(this.config.delay * 2);
-          const $ = cheerio.load(await page.content());
-
-          const containers = $('div.job-desktop, div.job-listing, article.job, li.job-item, [class*="job-card"]');
-          containers.each((_, el) => {
-            const $el = $(el);
-            const title =
-              $el.find('h4 a, h3 a, h2 a, [class*="title"] a, [class*="position"]').first().text().trim();
-            const company =
-              $el.find('.company a, [class*="company"] a, [class*="employer"]').first().text().trim() ||
-              $el.find('.company, [class*="company"]').first().text().trim();
-            const location =
-              $el.find('.boxes .box:first-child span, [class*="location"], [class*="region"]').first().text().trim() ||
-              'Remote, USA';
-            const salary = $el.find('.boxes .box').filter((_, b) => /[$€£]/.test($(b).text())).find('span').text().trim();
-            let href = $el.find('h4 a, h3 a, a[href*="/jobs/"]').first().attr('href') || '';
-            if (href && !href.startsWith('http')) href = `https://www.workingnomads.co${href}`;
-            const postedDate = $el.find('time').attr('datetime') || $el.find('time').text().trim();
-            this.pushIfValid(jobs, buildJob({ title, company, location, salary, url: href, source: 'Working Nomads', postedDate }), fc);
-          });
-          console.log(chalk.gray(`     → page ${p}: kept=${jobs.length} filtered=${fc.n}`));
-        }
-      }
-    } catch (e: any) {
-      const msg = `[WorkingNomads] ${e?.message || e}`; errors.push(msg); console.error(chalk.red(`  ✖ ${msg}`));
-    } finally { await page.close(); await this.close(); }
-    return { source: 'Working Nomads', jobs, scrapedAt: new Date().toISOString(), durationMs: Date.now() - t0, errors, filtered: fc.n };
-  }
-}
-
 export class YCombinatorScraper extends JobBoardScraper {
   async scrape(query: string, pages = 1): Promise<ScraperResult> {
     const t0 = Date.now(); const jobs: Job[] = []; const errors: string[] = []; const fc = { n: 0 };
@@ -728,17 +681,11 @@ export class YCombinatorScraper extends JobBoardScraper {
           return el ? el.getAttribute('data-page') : null;
         });
 
-        if (!dataPage) {
-          const msg = '[YC] data-page attribute not found';
-          errors.push(msg); console.warn(chalk.yellow(`  ⚠ ${msg}`)); continue;
-        }
+        if (!dataPage) { const msg = '[YC] data-page attribute not found'; errors.push(msg); console.warn(chalk.yellow(`  ⚠ ${msg}`)); continue; }
 
         let postings: any[] = [];
-        try {
-          postings = JSON.parse(dataPage)?.props?.jobPostings || [];
-        } catch {
-          const msg = '[YC] Failed to parse data-page JSON';
-          errors.push(msg); console.warn(chalk.yellow(`  ⚠ ${msg}`)); continue;
+        try { postings = JSON.parse(dataPage)?.props?.jobPostings || []; } catch {
+          const msg = '[YC] Failed to parse data-page JSON'; errors.push(msg); console.warn(chalk.yellow(`  ⚠ ${msg}`)); continue;
         }
 
         for (const posting of postings) {
@@ -763,7 +710,6 @@ export class YCombinatorScraper extends JobBoardScraper {
     return { source: 'Y Combinator', jobs, scrapedAt: new Date().toISOString(), durationMs: Date.now() - t0, errors, filtered: fc.n };
   }
 }
-
 
 export class NoDeskScraper extends JobBoardScraper {
   async scrape(query: string, pages = 2): Promise<ScraperResult> {
@@ -795,10 +741,7 @@ export class NoDeskScraper extends JobBoardScraper {
         });
 
         console.log(chalk.gray(`     → page ${p + 1}: kept=${jobs.length} filtered=${fc.n} new=${newOnPage}`));
-        if (newOnPage === 0 && p > 0) {
-          console.log(chalk.dim(`  [NoDesk] no new results on page ${p + 1}, stopping`));
-          break;
-        }
+        if (newOnPage === 0 && p > 0) { console.log(chalk.dim(`  [NoDesk] no new results on page ${p + 1}, stopping`)); break; }
       }
     } catch (e: any) {
       const msg = `[NoDesk] ${e?.message || e}`; errors.push(msg); console.error(chalk.red(`  ✖ ${msg}`));
@@ -806,7 +749,6 @@ export class NoDeskScraper extends JobBoardScraper {
     return { source: 'NoDesk', jobs, scrapedAt: new Date().toISOString(), durationMs: Date.now() - t0, errors, filtered: fc.n };
   }
 }
-
 
 export class HubstaffTalentScraper extends JobBoardScraper {
   async scrape(query: string, pages = 2): Promise<ScraperResult> {
@@ -826,7 +768,7 @@ export class HubstaffTalentScraper extends JobBoardScraper {
           const company = $el.find('.job-company a').first().text().trim();
           const location = $el.find('.job-company .location').text().trim() || 'Remote, USA';
           const salary = cleanHtml($el.find('.pay-rate').html() || '');
-          const description = cleanHtml($el.find('.profil-bio').html() || '');
+          const description = cleanDescription(cleanHtml($el.find('.profil-bio').html() || ''));
           let href = $el.find('a.name').attr('href') || '';
           if (href && !href.startsWith('http')) href = `https://talent.hubstaff.com${href}`;
           const postedDate = $el.find('.a-tooltip').text().trim();
@@ -858,7 +800,12 @@ export class SkipTheDriveScraper extends JobBoardScraper {
           const title = $el.find('h2.post-title.entry-title a').text().trim();
           const company = $el.find('.custom_fields_company_name_display_search_results').text().replace(/^\s*\n?\s*\u00a0/, '').trim();
           const postedDate = $el.find('.custom_fields_job_date_display_search_results').text().trim();
-          const description = cleanHtml($el.find('p').html() || '');
+          // FIX: was $el.find('p').html() — took only first <p>.
+          // Now collects all paragraph/content HTML and joins it.
+          const allParaHtml = $el.find('.entry-content, .post-excerpt').html()
+            || $el.find('p').map((_, p) => $(p).html()).get().join('\n')
+            || '';
+          const description = cleanDescription(cleanHtml(allParaHtml));
           const href = $el.find('h2.post-title.entry-title a').attr('href') || '';
           this.pushIfValid(jobs, buildJob({ title, company, location: 'Remote, USA', description, url: href, source: 'SkipTheDrive', postedDate }), fc);
         });
@@ -868,38 +815,6 @@ export class SkipTheDriveScraper extends JobBoardScraper {
       const msg = `[SkipTheDrive] ${e?.message || e}`; errors.push(msg); console.error(chalk.red(`  ✖ ${msg}`));
     } finally { await page.close(); await this.close(); }
     return { source: 'SkipTheDrive', jobs, scrapedAt: new Date().toISOString(), durationMs: Date.now() - t0, errors, filtered: fc.n };
-  }
-}
-
-
-export class JobspressoScraper extends JobBoardScraper {
-  async scrape(query: string, pages = 2): Promise<ScraperResult> {
-    const t0 = Date.now(); const jobs: Job[] = []; const errors: string[] = []; const fc = { n: 0 };
-    await this.initialize();
-    const page = await this.createPage();
-    try {
-      for (let p = 1; p <= pages; p++) {
-        const url = `https://jobspresso.co/remote-jobs/page/${p}/?search_keywords=${encodeURIComponent(query)}`;
-        console.log(chalk.dim(`  [Jobspresso] page ${p} → ${url}`));
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: this.config.timeout });
-        await this.sleep(this.config.delay);
-        const $ = cheerio.load(await page.content());
-        $('.job_listing').each((_, el) => {
-          const $el = $(el);
-          const title = $el.find('.job_listing-title').text().trim();
-          const company = $el.find('.job_listing-company strong').text().trim();
-          const location = $el.find('.job_listing-location').text().trim() || 'Remote';
-          const jobTypeRaw = $el.find('.job_listing-type').text().trim();
-          let href = $el.find('a.job_listing-clickbox, a').attr('href') || '';
-          if (href && !href.startsWith('http')) href = `https://jobspresso.co${href}`;
-          this.pushIfValid(jobs, buildJob({ title, company, location, jobType: jobTypeRaw, url: href, source: 'Jobspresso' }), fc);
-        });
-        console.log(chalk.gray(`     → page ${p}: kept=${jobs.length} filtered=${fc.n}`));
-      }
-    } catch (e: any) {
-      const msg = `[Jobspresso] ${e?.message || e}`; errors.push(msg); console.error(chalk.red(`  ✖ ${msg}`));
-    } finally { await page.close(); await this.close(); }
-    return { source: 'Jobspresso', jobs, scrapedAt: new Date().toISOString(), durationMs: Date.now() - t0, errors, filtered: fc.n };
   }
 }
 
@@ -921,7 +836,7 @@ export class RemoteHubScraper extends JobBoardScraper {
           const company = $el.find('.account-name').text().trim();
           const location = $el.find('.location .text').text().trim() || 'Remote, USA';
           const salary = cleanHtml($el.find('.mat-chip.blue-2').html() || '');
-          const description = cleanHtml($el.find('.description').html() || '');
+          const description = cleanDescription(cleanHtml($el.find('.description').html() || ''));
           let href = $el.find('.entity-detailed-link').attr('href') || '';
           if (href && !href.startsWith('http')) href = `https://www.remotehub.com${href}`;
           this.pushIfValid(jobs, buildJob({ title, company, location, salary, description, url: href, source: 'RemoteHub' }), fc);
@@ -938,15 +853,13 @@ export class RemoteHubScraper extends JobBoardScraper {
 export class LinkedInScraper extends JobBoardScraper {
   async scrape(query: string, pages = 2): Promise<ScraperResult> {
     const t0 = Date.now(); const jobs: Job[] = []; const errors: string[] = []; const fc = { n: 0 };
-    const geoId = '103644278'; // United States
+    const geoId = '103644278';
 
-    // ── Step 1: Pre-flight connectivity check — fast-fail if LinkedIn is unreachable ──
     try {
       await httpsGet('https://www.linkedin.com/robots.txt', 5000);
     } catch (e: any) {
       const msg = `[LinkedIn] Pre-flight check failed — LinkedIn is unreachable (${e?.message || e}). Skipping all pages.`;
-      errors.push(msg);
-      console.warn(chalk.yellow(`  ⚠ ${msg}`));
+      errors.push(msg); console.warn(chalk.yellow(`  ⚠ ${msg}`));
       return { source: 'LinkedIn', jobs, scrapedAt: new Date().toISOString(), durationMs: Date.now() - t0, errors, filtered: fc.n };
     }
 
@@ -957,8 +870,6 @@ export class LinkedInScraper extends JobBoardScraper {
       try {
         const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(query)}&location=United%20States&geoId=${geoId}&f_WT=2&start=${p * 25}`;
         console.log(chalk.dim(`  [LinkedIn] page ${p + 1} → ${url}`));
-
-        // Hard 15s timeout — guest API is a static HTML fragment, 60s is way too long
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
         await this.sleep(this.config.delay + Math.floor(Math.random() * 800));
 
@@ -988,8 +899,7 @@ export class LinkedInScraper extends JobBoardScraper {
           const postedDate =
             $el.find('time.job-search-card__listdate').attr('datetime') ||
             $el.find('time').attr('datetime') || '';
-          const logo = $el.find('img.artdeco-entity-image').attr('data-delayed-url') ||
-            $el.find('img').attr('src') || '';
+          const logo = $el.find('img.artdeco-entity-image').attr('data-delayed-url') || $el.find('img').attr('src') || '';
 
           if (!title || !company || !href) return;
           newOnPage++;
@@ -997,31 +907,18 @@ export class LinkedInScraper extends JobBoardScraper {
         });
 
         console.log(chalk.gray(`     → page ${p + 1}: kept=${jobs.length} filtered=${fc.n} new=${newOnPage}`));
-        if (newOnPage === 0) {
-          console.log(chalk.dim(`  [LinkedIn] no results on page ${p + 1}, stopping`));
-          await page.close();
-          break;
-        }
+        if (newOnPage === 0) { console.log(chalk.dim(`  [LinkedIn] no results on page ${p + 1}, stopping`)); await page.close(); break; }
       } catch (e: any) {
-        const msg = `[LinkedIn] page ${p + 1}: ${e?.message || e}`;
-        errors.push(msg);
-        console.error(chalk.red(`  ✖ ${msg}`));
+        const msg = `[LinkedIn] page ${p + 1}: ${e?.message || e}`; errors.push(msg); console.error(chalk.red(`  ✖ ${msg}`));
         if (p === 0 && (String(e?.message).includes('DISCONNECTED') || String(e?.message).includes('ERR_'))) {
           console.warn(chalk.yellow(`  ⚠ [LinkedIn] Network error on page 1 — skipping remaining pages`));
-          await page.close().catch(() => { });
-          break;
+          await page.close().catch(() => { }); break;
         }
-      } finally {
-        try { await page.close(); } catch { /* already closed */ }
-      }
+      } finally { try { await page.close(); } catch { /* already closed */ } }
       if (p < pages - 1) await this.sleep(this.config.delay);
     }
 
-    await Promise.race([
-      this.close(),
-      new Promise<void>(resolve => setTimeout(resolve, 5000)),
-    ]);
-
+    await Promise.race([this.close(), new Promise<void>(resolve => setTimeout(resolve, 5000))]);
     return { source: 'LinkedIn', jobs, scrapedAt: new Date().toISOString(), durationMs: Date.now() - t0, errors, filtered: fc.n };
   }
 }
@@ -1048,24 +945,57 @@ export class JobDetailEnricher extends JobBoardScraper {
     try {
       await page.goto(job.url, { waitUntil: 'networkidle2', timeout: this.config.timeout });
       await this.sleep(800);
-      const rawHtml = await page.evaluate(() => {
-        const selectors = [
-          '[class*="job-description"]', '[class*="description"]',
-          '[class*="job-detail"]', '[class*="jobDescription"]', 'article', 'main',
+
+      const rawHtml = await page.evaluate((source: string) => {
+        const SOURCE_SELECTORS: Record<string, string[]> = {
+          'We Work Remotely':  ['.listing-container', '[class*="listing-container"]', 'article'],
+          'RemoteOK':          ['.markdown', '#job-description', 'td.markdown', '[id*="job"]'],
+          'Remotive':          ['.job-description', '[class*="job-description"]'],
+          'Working Nomads':    ['.job-description', '[class*="description"]', 'article', 'main'],
+          'Y Combinator':      ['.prose', '[class*="description"]', 'main'],
+          'NoDesk':            ['article.job', '.job-description', '[class*="content"]', 'main'],
+          'Hubstaff Talent':   ['.job-description', '.description', '[class*="description"]'],
+          'SkipTheDrive':      ['.entry-content', '.post-content', 'article', 'main'],
+          'Jobspresso':        ['.job_description', '[class*="description"]', '.entry-content'],
+          'RemoteHub':         ['.job-description', '.description', '[class*="description"]'],
+          'LinkedIn':          ['.description__text', '.show-more-less-html__markup', '[class*="description"]'],
+        };
+
+        const GENERIC_FALLBACK = [
+          '[class*="job-description"]',
+          '[class*="jobDescription"]',
+          '[class*="job-detail"]',
+          '[class*="job_description"]',
+          'article',
+          'main',
         ];
+
+        const selectors = [...(SOURCE_SELECTORS[source] || []), ...GENERIC_FALLBACK];
+
         for (const sel of selectors) {
           const el = document.querySelector(sel);
-          if (el && el.textContent && el.textContent.trim().length > 100) return el.innerHTML;
+          // FIX: raised minimum threshold 100 → 200 chars to skip nav snippets
+          if (el && el.textContent && el.textContent.trim().length > 200) {
+            return el.innerHTML;
+          }
         }
         return document.body.innerHTML;
-      });
-      const description = cleanHtml(rawHtml);
+      }, job.source);
+
+      const enrichedDescription = cleanDescription(cleanHtml(rawHtml));
+      const enrichedIsValid = isLikelyRealDescription(enrichedDescription);
+
+      const useEnriched = enrichedIsValid && enrichedDescription.length > (job.description?.length ?? 0);
+      const finalDescription = useEnriched ? enrichedDescription : (job.description || enrichedDescription);
+      const descToUse = finalDescription || job.description || '';
+
       return {
-        ...job, description,
-        requirements: extractBulletSection(description, ['Requirements', 'Qualifications', 'What you need', 'Must have', 'Skills required']),
-        responsibilities: extractBulletSection(description, ['Responsibilities', 'What you will do', 'You will', 'Role', 'The role']),
-        techStack: extractTechStack(description),
-        benefits: extractBenefits(description),
+        ...job,
+        description: descToUse,
+        requirements: extractBulletSection(descToUse, ['Requirements', 'Qualifications', 'What you need', 'Must have', 'Skills required']),
+        responsibilities: extractBulletSection(descToUse, ['Responsibilities', 'What you will do', 'You will', 'Role', 'The role']),
+        techStack: extractTechStack(descToUse),
+        benefits: extractBenefits(descToUse),
       };
     } catch { return job; } finally { await page.close(); }
   }
@@ -1074,7 +1004,6 @@ export class JobDetailEnricher extends JobBoardScraper {
 interface IJobService {
   saveJobs(jobs: Prisma.JobCreateInput[]): Promise<{ added: number; duplicates: number; skipped: number }>;
 }
-
 
 export class ScraperManager {
   private config: ScraperOptions;
@@ -1093,11 +1022,9 @@ export class ScraperManager {
       { scraper: new WeWorkRemotelyScraper(this.config), query: 'developer', pages: 2 },
       { scraper: new RemoteOKScraper(this.config), query: 'developer', pages: 1 },
       { scraper: new RemotiveScraper(this.config), query: 'engineer', pages: 1 },
-      { scraper: new WorkingNomadsScraper(this.config), query: 'developer', pages: 2 },
       { scraper: new YCombinatorScraper(this.config), query: 'software', pages: 1 },
       { scraper: new NoDeskScraper(this.config), query: 'remote', pages: 2 },
       { scraper: new HubstaffTalentScraper(this.config), query: 'developer', pages: 2 },
-      { scraper: new JobspressoScraper(this.config), query: 'developer', pages: 1 },
       { scraper: new SkipTheDriveScraper(this.config), query: 'developer', pages: 1 },
       { scraper: new RemoteHubScraper(this.config), query: 'developer', pages: 1 },
       { scraper: new LinkedInScraper(this.config), query: 'software engineer', pages: 2 },
@@ -1163,19 +1090,14 @@ export class ScraperManager {
   }
 
   async runOne(source: string): Promise<ScrapeRunResult> {
-
     const all = await this.runAll();
     const found = all.find(r => r.source === source);
-    if (!found) {
-      throw new Error(`Source for "${source}" not found.`);
-
-    }
+    if (!found) throw new Error(`Source for "${source}" not found.`);
     return found;
   }
-
 }
 
-export { cleanHtml as stripHtml, extractBulletSection as extractSection };
+export { cleanHtml as stripHtml, cleanDescription as stripDescription, extractBulletSection as extractSection };
 
 async function buildCache(): Promise<CacheService> {
   const cache = new CacheService();
@@ -1205,7 +1127,6 @@ async function main() {
   const container = { db };
   const cache = await buildCache();
   const jobService = new JobService(container as any, cache);
-
   const manager = new ScraperManager(null, null, jobService, { headless: true } as ScraperOptions);
 
   console.log(chalk.cyan('Starting scrape run across 11 job boards...\n'));
@@ -1233,7 +1154,7 @@ async function main() {
   } finally {
     await Promise.allSettled([
       db.$disconnect(),
-      cache.disconnect().catch(() => { /* Redis may already be closed */ }),
+      cache.disconnect().catch(() => { }),
     ]);
     console.log(chalk.dim('\n  Connections closed'));
   }
@@ -1241,10 +1162,7 @@ async function main() {
   const totalTime = ((Date.now() - t0) / 1000 / 60).toFixed(1);
   console.log(chalk.gray(`\nTotal runtime: ${totalTime} minutes\n`));
 
-  const totalAdded = results.reduce((s, r) => s + r.jobsAdded, 0);
-  const totalFiltered = results.reduce((s, r) => s + r.jobsFiltered, 0);
   const failed = results.filter(r => r.status === 'FAILED');
-
   console.log(chalk.cyan('Per-source breakdown:'));
   results.forEach(r => {
     const icon = r.status === 'FAILED' ? chalk.red('✖') : chalk.green('✔');

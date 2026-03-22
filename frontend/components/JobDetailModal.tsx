@@ -57,33 +57,33 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
             {/* Tags */}
             <div className="flex flex-wrap gap-2">
               {job.location && (
-                <Badge variant="secondary" className="bg-white border border-gray-300">
+                <Badge variant="secondary" className="bg-white border border-gray-300 hover:text-white">
                   <MapPin className="w-4 h-4 mr-1.5" />
                   {job.location}
                 </Badge>
               )}
 
-              <Badge variant="secondary" className="bg-white border border-gray-300">
+              <Badge variant="secondary" className="bg-white border border-gray-300 hover:text-white">
                 <Briefcase className="w-4 h-4 mr-1.5" />
                 {formatJobType(job.type)}
               </Badge>
 
               {job.salary && (
-                <Badge variant="secondary" className="bg-black text-white border-black">
+                <Badge variant="secondary" className="bg-white border border-gray-300 hover:text-white">
                   <DollarSign className="w-4 h-4 mr-1.5" />
                   {job.salary}
                 </Badge>
               )}
 
               {job.source && (
-                <Badge variant="secondary" className="bg-white border border-gray-300">
+                <Badge variant="secondary" className="bg-white border border-gray-300 hover:text-white">
                   <Globe className="w-4 h-4 mr-1.5" />
                   {job.source}
                 </Badge>
               )}
 
               {job.scrapedAt && (
-                <Badge variant="outline" className="text-[#FFFFFF] border-gray-300">
+                <Badge variant="outline" className="text-[#FFFFFF] border-gray-300 hover:text-white">
                   <Clock className="w-4 h-4 mr-1.5" />
                   {formatRelativeTime(job.scrapedAt)}
                 </Badge>
@@ -94,8 +94,8 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
 
             {job.description && (
               <div>
-                <h3 className="font-bold text-lg mb-3 text-black">Job Description</h3>
-                <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                <h3 className="font-bold text-lg mb-3 text-gray-700">Job Description</h3>
+                <p className="text-white leading-relaxed whitespace-pre-line">
                   {job.description}
                 </p>
               </div>

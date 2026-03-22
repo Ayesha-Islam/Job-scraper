@@ -27,7 +27,7 @@ model Job {
   type        JobType  @default(FULL_TIME)
   url         String   @unique
   source      String
-  description String?  @default("")
+  description String?  @db.Text @default("")
   hash        String   @unique
   postedAt    DateTime @default(now())
   isActive    Boolean  @default(true)
