@@ -35,7 +35,6 @@ export class AuthController {
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Prisma throws P2002 on duplicate email — no manual SELECT needed
       const user = await this.db.user.create({
         data: { email, password: hashedPassword, name },
         select: { id: true, email: true, name: true, createdAt: true },
@@ -62,8 +61,6 @@ export class AuthController {
 
       const user = await this.db.user.findUnique({ where: { email } });
 
-      // Constant-time check: always run bcrypt.compare even if user is null
-      // to prevent timing attacks that reveal whether an email is registered.
       const passwordMatch = user
         ? await bcrypt.compare(password, user.password)
         : await bcrypt.compare(password, '$2a$10$invalidhashpaddingtowastetime000');
@@ -91,7 +88,6 @@ export class AuthController {
   }
 
   async me(req: Request, res: Response) {
-    // TODO: decode JWT from Authorization header and return user from DB
     return res.status(200).json({ success: true, data: 'Authenticated user context' });
   }
 }

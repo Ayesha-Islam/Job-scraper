@@ -14,8 +14,9 @@ export interface Env {
   RESEND_API_KEY?: string
   ALERT_EMAIL?: string
   FROM_EMAIL?: string
-  // ── Pool tunables (optional, have safe defaults) ──
   DB_POOL_MAX?: string
+  DB_POOL_IDLE_TIMEOUT_MS?: string
+  DB_POOL_CONNECTION_TIMEOUT_MS?: string
 }
 
 const missing = (k: string) => {
@@ -35,24 +36,25 @@ export const env: Env = {
   ALERT_EMAIL: process.env.ALERT_EMAIL,
   FROM_EMAIL: process.env.FROM_EMAIL,
   DB_POOL_MAX: process.env.DB_POOL_MAX,
+  DB_POOL_IDLE_TIMEOUT_MS: process.env.DB_POOL_IDLE_TIMEOUT_MS,
+  DB_POOL_CONNECTION_TIMEOUT_MS: process.env.DB_POOL_CONNECTION_TIMEOUT_MS,
 }
+
+const isPrismaHostedDb = env.DATABASE_URL.includes('db.prisma.io');
+const shouldUseSsl = env.NODE_ENV === 'production' || isPrismaHostedDb;
 
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
-  ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-
-  // ── Explicit pool sizing (was using pg default of 10) ──────────────────────
-  // Set DB_POOL_MAX in .env for production (recommended: 20–25).
-  // Keep low locally to avoid exhausting dev Postgres connections.
-  max: parseInt(env.DB_POOL_MAX ?? (env.NODE_ENV === 'production' ? '20' : '5'), 10),
-
-  // ── Connection lifecycle ───────────────────────────────────────────────────
-  // Release idle connections after 30s to avoid stale handles.
-  idleTimeoutMillis: 30_000,
-
-  // ── Acquisition timeout ────────────────────────────────────────────────────
-  // Fail fast if the pool is exhausted — better a 503 than a hanging request.
-  connectionTimeoutMillis: 5_000,
+  ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
+  max: parseInt(env.DB_POOL_MAX ?? (env.NODE_ENV === 'production' ? '20' : '2'), 10),
+  idleTimeoutMillis: parseInt(
+    env.DB_POOL_IDLE_TIMEOUT_MS ?? (env.NODE_ENV === 'production' ? '30000' : '10000'),
+    10
+  ),
+  connectionTimeoutMillis: parseInt(
+    env.DB_POOL_CONNECTION_TIMEOUT_MS ?? (env.NODE_ENV === 'production' ? '10000' : '15000'),
+    10
+  ),
 });
 
 pool.on('connect', () => {
@@ -60,7 +62,6 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-  // Fatal idle-client error — log and exit so the process manager restarts cleanly.
   console.error('Unexpected error on idle pool client:', err);
   process.exit(-1);
 });

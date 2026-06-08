@@ -7,9 +7,6 @@ import { queryJobs, queryJobStats } from '../lib/job.sql';
 
 const DEBUG = process.env.DEBUG === 'true';
 
-// ─── Semantic Key Normalization ───────────────────────────────────────────────
-// These three functions define the dedup identity.
-// MUST stay in sync with migration.sql backfill logic.
 
 function normalizeCompanyKey(company: string): string {
   return company.toLowerCase().trim();
@@ -22,7 +19,6 @@ function normalizePositionKey(position: string): string {
 function normalizeLocationKey(location: string | null | undefined): string {
   const raw = (location ?? 'remote').toLowerCase().trim();
 
-  // Collapse common remote variants to a single canonical value
   if (
     raw === '' ||
     raw === 'remote' ||
@@ -42,7 +38,6 @@ function normalizeLocationKey(location: string | null | undefined): string {
   return raw;
 }
 
-// ─── Service ─────────────────────────────────────────────────────────────────
 
 export class JobService {
   constructor(
@@ -50,7 +45,6 @@ export class JobService {
     private cache: CacheService
   ) {}
 
-  // ─── DB Retry Utility ──────────────────────────────────────────────────────
 
   private async withDbRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
     for (let i = 0; i < retries; i++) {
@@ -78,7 +72,6 @@ export class JobService {
     throw new Error('DB retries exhausted');
   }
 
-  // ─── Description Validation / Cleaning ────────────────────────────────────
 
   private removeEmoji(text: string): string {
     if (!text) return '';
@@ -146,7 +139,6 @@ export class JobService {
     return null;
   }
 
-  // ─── Job Data Validation ──────────────────────────────────────────────────
 
   private validateJobData(job: Prisma.JobCreateInput): boolean {
     if (!job.position || typeof job.position !== 'string' || job.position.trim() === '') {
@@ -201,7 +193,6 @@ export class JobService {
     return true;
   }
 
-  // ─── Job Data Normalization ────────────────────────────────────────────────
 
   private normalizeJobData(job: Prisma.JobCreateInput): Prisma.JobCreateInput {
     const position = job.position.trim();
@@ -227,8 +218,6 @@ export class JobService {
     };
   }
 
-  // ─── READ: Search / Filter / Paginate ─────────────────────────────────────
-  // Delegates to raw SQL layer — DO NOT use Prisma here
 
   async getJobs(
     page: number = 1,
@@ -243,15 +232,12 @@ export class JobService {
       return cached;
     }
 
-    // → raw SQL (search + filter + sort + pagination)
     const result = await queryJobs(this.container.pool, page, limit, filters);
 
     await this.cache.set(cacheKey, result, 300);
     return result;
   }
 
-  // ─── READ: Single Job ──────────────────────────────────────────────────────
-  // Simple PK lookup — Prisma is correct here
 
   async getJobById(id: string): Promise<Job | null> {
     const cacheKey = this.cache.generateKey('job', { id });
@@ -259,7 +245,6 @@ export class JobService {
     const cached = await this.cache.get<Job>(cacheKey);
     if (cached) return cached;
 
-    // → Prisma (simple single-row PK lookup)
     const job = await this.container.db.job.findUnique({ where: { id } });
 
     if (job) await this.cache.set(cacheKey, job as Job, 600);
@@ -267,8 +252,6 @@ export class JobService {
     return job as Job | null;
   }
 
-  // ─── READ: Stats / Analytics ───────────────────────────────────────────────
-  // Aggregation queries — MUST use raw SQL
 
   async getStats(): Promise<JobStats> {
     const cacheKey = this.cache.generateKey('stats', {});
@@ -281,7 +264,6 @@ export class JobService {
 
     console.log(chalk.cyan('   🔄 Calculating fresh stats...'));
 
-    // → raw SQL (analytics aggregations)
     const stats = await queryJobStats(this.container.pool);
 
     console.log(chalk.green(`   ✅ Stats: ${stats.total} total, ${stats.addedToday} added today`));
@@ -290,20 +272,6 @@ export class JobService {
     return stats;
   }
 
-  // ─── WRITE: Save Scraped Jobs ──────────────────────────────────────────────
-  //
-  // Dedup logic — Option D (semantic key):
-  //
-  //   1. Compute companyKey + positionKey + locationKey from the incoming job
-  //   2. findFirst by composite key — if found → UPDATE, if not → INSERT
-  //   3. No hash. No url unique check. No P2002 possible.
-  //
-  // Update policy when a duplicate is found:
-  //   - Always update: url, source, salary, type, scrapedAt, isActive
-  //   - Update description ONLY if incoming is better (longer, not null)
-  //   - Update postedAt ONLY if incoming is earlier (preserve first-seen date)
-  //   - Never overwrite: companyKey, positionKey, locationKey (dedup keys),
-  //     createdAt, id
 
   async saveJobs(jobs: Prisma.JobCreateInput[]): Promise<{
     added: number;
@@ -316,7 +284,6 @@ export class JobService {
     let skipped = 0;
     let descriptionUpdated = 0;
 
-    // ── Phase 1: validate ────────────────────────────────────────────────────
     const validJobs = jobs.filter(job => {
       const isValid = this.validateJobData(job);
       if (!isValid) skipped++;
@@ -330,13 +297,10 @@ export class JobService {
 
     console.log(chalk.cyan(`   📝 Saving ${validJobs.length} validated jobs (${skipped} skipped)...`));
 
-    // ── Phase 2: persist ─────────────────────────────────────────────────────
     for (const job of validJobs) {
       try {
-        // Normalize display values
         const norm = this.normalizeJobData(job);
 
-        // Clean description — skip job entirely if description is unusable
         const cleanedDescription = this.cleanDescription(norm.description);
         if (!cleanedDescription) {
           if (DEBUG) console.log(chalk.gray(`   ⏭  No valid description: ${norm.position} @ ${norm.company}`));
@@ -344,12 +308,10 @@ export class JobService {
           continue;
         }
 
-        // Compute the three semantic keys — these are the dedup authority
         const companyKey  = normalizeCompanyKey(norm.company);
         const positionKey = normalizePositionKey(norm.position);
         const locationKey = normalizeLocationKey(norm.location);
 
-        // ── Dedup lookup: one query, one authority ──────────────────────────
         const existing = await this.withDbRetry(() =>
           this.container.db.job.findFirst({
             where:  { companyKey, positionKey, locationKey },
@@ -363,11 +325,6 @@ export class JobService {
         );
 
         if (existing) {
-          // ── UPDATE branch ─────────────────────────────────────────────────
-          //
-          // Description update policy:
-          //   Keep whichever description is longer (more complete).
-          //   Never replace a good description with a shorter one.
           const betterDescription =
             cleanedDescription.length > (existing.description?.length ?? 0)
               ? cleanedDescription
@@ -378,8 +335,6 @@ export class JobService {
             if (DEBUG) console.log(chalk.blue(`     ↻ Better description: ${norm.position}`));
           }
 
-          // postedAt update policy:
-          //   Keep the earliest date we've ever seen for this job.
           const incomingPostedAt = norm.postedAt ? new Date(norm.postedAt as string) : null;
           const earlierPostedAt =
             incomingPostedAt && incomingPostedAt < existing.postedAt
@@ -390,14 +345,12 @@ export class JobService {
             this.container.db.job.update({
               where: { id: existing.id },
               data: {
-                // Always refresh these on every scrape
                 url:         norm.url,
                 source:      norm.source,
                 salary:      norm.salary as string | null,
                 type:        norm.type,
                 isActive:    true,
                 scrapedAt:   new Date(),
-                // Conditional updates
                 description: betterDescription,
                 ...(earlierPostedAt ? { postedAt: earlierPostedAt } : {}),
               },
@@ -408,7 +361,6 @@ export class JobService {
           if (DEBUG) console.log(chalk.gray(`   ↻ Updated: ${norm.position} @ ${norm.company}`));
 
         } else {
-          // ── INSERT branch ─────────────────────────────────────────────────
           await this.withDbRetry(() =>
             this.container.db.job.create({
               data: {
@@ -422,7 +374,6 @@ export class JobService {
                 description: cleanedDescription,
                 isActive:    true,
                 scrapedAt:   new Date(),
-                // Semantic key columns
                 companyKey,
                 positionKey,
                 locationKey,
@@ -436,10 +387,6 @@ export class JobService {
         }
 
       } catch (error: any) {
-        // P2002 should no longer happen with Option D.
-        // If it does, it means two jobs in the SAME batch share the same
-        // semantic key (same company+position+location scraped twice in one run).
-        // That's a valid dedup — log it clearly instead of silently skipping.
         if (error?.code === 'P2002') {
           if (DEBUG) console.log(chalk.gray(
             `   ⟳ Intra-batch duplicate (same semantic key): ${job.position} @ ${job.company}`
@@ -453,7 +400,6 @@ export class JobService {
       }
     }
 
-    // Invalidate stats cache if new jobs were added
     if (added > 0 || descriptionUpdated > 0) {
       await this.cache.deletePattern('stats:*');
       if (DEBUG) console.log(chalk.gray('   🔄 Stats cache invalidated'));
@@ -462,10 +408,6 @@ export class JobService {
     return { added, duplicates, skipped, descriptionUpdated };
   }
 
-  // ─── WRITE: Cleanup Bad Descriptions ──────────────────────────────────────
-  // Two SQL queries replace the original N+1 Prisma pattern.
-  // Step 1: find bad IDs inside Postgres (nothing loaded into Node memory)
-  // Step 2: clear all in one UPDATE with ANY($1)
 
   async cleanupBadDescriptions(): Promise<{ updated: number; cleared: number }> {
     console.log(chalk.cyan('\n   🧹 Cleaning up bad descriptions...\n'));
@@ -511,7 +453,6 @@ export class JobService {
     return { updated: 0, cleared };
   }
 
-  // ─── Cache Utilities ───────────────────────────────────────────────────────
 
   async invalidateCaches(): Promise<void> {
     await Promise.all([

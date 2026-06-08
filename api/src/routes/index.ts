@@ -22,9 +22,6 @@ export function createRoutes(container: Container): Router {
     authController,
   } = container;
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // System / Health
-  // ────────────────────────────────────────────────────────────────────────────
   router.get('/health', healthController.check.bind(healthController));
   router.get('/health/db', healthController.checkDatabase.bind(healthController));
   router.get('/health/redis', healthController.checkRedis.bind(healthController));
@@ -33,7 +30,6 @@ export function createRoutes(container: Container): Router {
   router.get(`${API_V1}/health/db`, healthController.checkDatabase.bind(healthController));
   router.get(`${API_V1}/health/redis`, healthController.checkRedis.bind(healthController));
 
-  // Optional route map for quick local debugging.
   router.get(`${API_V1}`, (_req: Request, res: Response) => {
     res.json({
       success: true,
@@ -60,31 +56,17 @@ export function createRoutes(container: Container): Router {
     });
   });
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Auth
-  // ────────────────────────────────────────────────────────────────────────────
   router.post(`${API_V1}/auth/register`, authController.register.bind(authController));
   router.post(`${API_V1}/auth/login`, authController.login.bind(authController));
   router.get(`${API_V1}/auth/me`, authController.me.bind(authController));
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Jobs
-  // Keep /jobs/search before /jobs/:id so "search" is not treated as an id.
-  // ────────────────────────────────────────────────────────────────────────────
   router.get(`${API_V1}/jobs`, jobController.getJobs.bind(jobController));
   router.get(`${API_V1}/jobs/search`, jobController.searchJobs.bind(jobController));
   router.get(`${API_V1}/jobs/:id`, jobController.getJobById.bind(jobController));
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Stats
-  // ────────────────────────────────────────────────────────────────────────────
   router.get(`${API_V1}/stats`, statsController.getStats.bind(statsController));
   router.get(`${API_V1}/stats/sources`, statsController.getStats.bind(statsController));
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // Admin
-  // TODO production: protect these routes with authentication/authorization.
-  // ────────────────────────────────────────────────────────────────────────────
   router.post(`${API_V1}/admin/scrape`, adminController.triggerScrape.bind(adminController));
   router.get(`${API_V1}/admin/scrape`, (_req: Request, res: Response) => {
     res.status(405).json({

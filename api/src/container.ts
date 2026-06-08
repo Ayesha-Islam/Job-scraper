@@ -61,7 +61,6 @@ export class Container {
     this._statsController = new StatsController(this._jobService);
     this._healthController = new HealthController(this);
 
-    // ── Auth: Prisma (was Pool) ───────────────────────────────────────────────
     this._authController  = new AuthController(this._db);
 
     this._adminController = new AdminController(this);

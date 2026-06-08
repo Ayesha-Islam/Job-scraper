@@ -417,8 +417,7 @@ export function toDbJob(job: Job): Prisma.JobCreateInput {
     postedAt = undefined;
   }
 
-  // Semantic dedup keys — must match normalizeXxxKey() in job.svc.ts exactly
-  const companyKey  = job.company.toLowerCase().trim();
+  const companyKey = job.company.toLowerCase().trim();
   const positionKey = job.title.toLowerCase().trim();
   const locationKey = (() => {
     const raw = (job.location ?? 'remote').toLowerCase().trim();
@@ -439,13 +438,13 @@ export function toDbJob(job: Job): Prisma.JobCreateInput {
   })();
 
   return {
-    position:    job.title,
-    company:     job.company,
-    location:    job.location || null,
-    salary:      (job.salary && /[\d$\u20ac\u00a3\u00a5\u20b9]/.test(job.salary)) ? job.salary : null,
-    type:        toPrismaJobType(job.jobType),
-    url:         job.url,
-    source:      job.source,
+    position: job.title,
+    company: job.company,
+    location: job.location || null,
+    salary: (job.salary && /[\d$\u20ac\u00a3\u00a5\u20b9]/.test(job.salary)) ? job.salary : null,
+    type: toPrismaJobType(job.jobType),
+    url: job.url,
+    source: job.source,
     description: job.description?.trim() || null,
     companyKey,
     positionKey,
@@ -569,7 +568,6 @@ export class WeWorkRemotelyScraper extends JobBoardScraper {
           const postedDate = $el.find('pubDate').text().trim();
           const region = $el.find('region').text().trim() || 'Remote, USA';
 
-          // FIX: parse CDATA as HTML, target only the real job body
           const rawCdata = $el.find('description').text();
           const $inner = cheerio.load(rawCdata);
           const listingHtml = $inner('.listing-container').html()
@@ -623,7 +621,6 @@ export class RemoteOKScraper extends JobBoardScraper {
           const tags = $el.find('.tags a').map((_, t) => $(t).text().trim()).get();
           const logo = $el.find('img.logo').attr('src') || '';
           const postedDate = $el.find('td.time time').attr('datetime') || '';
-          // FIX: try to grab inline expanded-row description
           const descHtml = $el.find('.expanded td').html() || '';
           const description = descHtml ? cleanDescription(cleanHtml(descHtml)) : '';
           this.pushIfValid(jobs, buildJob({ title, company, location, salary, description, url: jobUrl, source: 'RemoteOK', postedDate, categories: tags, companyLogo: logo }), fc);
@@ -820,8 +817,6 @@ export class SkipTheDriveScraper extends JobBoardScraper {
           const title = $el.find('h2.post-title.entry-title a').text().trim();
           const company = $el.find('.custom_fields_company_name_display_search_results').text().replace(/^\s*\n?\s*\u00a0/, '').trim();
           const postedDate = $el.find('.custom_fields_job_date_display_search_results').text().trim();
-          // FIX: was $el.find('p').html() — took only first <p>.
-          // Now collects all paragraph/content HTML and joins it.
           const allParaHtml = $el.find('.entry-content, .post-excerpt').html()
             || $el.find('p').map((_, p) => $(p).html()).get().join('\n')
             || '';
@@ -968,17 +963,17 @@ export class JobDetailEnricher extends JobBoardScraper {
 
       const rawHtml = await page.evaluate((source: string) => {
         const SOURCE_SELECTORS: Record<string, string[]> = {
-          'We Work Remotely':  ['.listing-container', '[class*="listing-container"]', 'article'],
-          'RemoteOK':          ['.markdown', '#job-description', 'td.markdown', '[id*="job"]'],
-          'Remotive':          ['.job-description', '[class*="job-description"]'],
-          'Working Nomads':    ['.job-description', '[class*="description"]', 'article', 'main'],
-          'Y Combinator':      ['.prose', '[class*="description"]', 'main'],
-          'NoDesk':            ['article.job', '.job-description', '[class*="content"]', 'main'],
-          'Hubstaff Talent':   ['.job-description', '.description', '[class*="description"]'],
-          'SkipTheDrive':      ['.entry-content', '.post-content', 'article', 'main'],
-          'Jobspresso':        ['.job_description', '[class*="description"]', '.entry-content'],
-          'RemoteHub':         ['.job-description', '.description', '[class*="description"]'],
-          'LinkedIn':          ['.description__text', '.show-more-less-html__markup', '[class*="description"]'],
+          'We Work Remotely': ['.listing-container', '[class*="listing-container"]', 'article'],
+          'RemoteOK': ['.markdown', '#job-description', 'td.markdown', '[id*="job"]'],
+          'Remotive': ['.job-description', '[class*="job-description"]'],
+          'Working Nomads': ['.job-description', '[class*="description"]', 'article', 'main'],
+          'Y Combinator': ['.prose', '[class*="description"]', 'main'],
+          'NoDesk': ['article.job', '.job-description', '[class*="content"]', 'main'],
+          'Hubstaff Talent': ['.job-description', '.description', '[class*="description"]'],
+          'SkipTheDrive': ['.entry-content', '.post-content', 'article', 'main'],
+          'Jobspresso': ['.job_description', '[class*="description"]', '.entry-content'],
+          'RemoteHub': ['.job-description', '.description', '[class*="description"]'],
+          'LinkedIn': ['.description__text', '.show-more-less-html__markup', '[class*="description"]'],
         };
 
         const GENERIC_FALLBACK = [
@@ -994,7 +989,6 @@ export class JobDetailEnricher extends JobBoardScraper {
 
         for (const sel of selectors) {
           const el = document.querySelector(sel);
-          // FIX: raised minimum threshold 100 → 200 chars to skip nav snippets
           if (el && el.textContent && el.textContent.trim().length > 200) {
             return el.innerHTML;
           }
