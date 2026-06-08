@@ -6,18 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum JobType {
-  FULL_TIME
-  PART_TIME
-  CONTRACT
-  INTERNSHIP
-}
-
-enum ScrapeStatus {
-  SUCCESS
-  FAILED
-}
-
 model Job {
   id          String   @id @default(uuid())
   company     String
@@ -25,21 +13,28 @@ model Job {
   location    String?
   salary      String?
   type        JobType  @default(FULL_TIME)
-  url         String   @unique
+  url         String
   source      String
-  description String?  @db.Text @default("")
-  hash        String   @unique
+  description String?  @default("")
   postedAt    DateTime @default(now())
+
+  
+  companyKey  String
+  positionKey String
+  locationKey String
+
   isActive    Boolean  @default(true)
   scrapedAt   DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
- 
+  @@unique([companyKey, positionKey, locationKey])
   @@index([source])
-  @@index([hash])
   @@index([createdAt])
   @@index([isActive])
+  @@index([companyKey])
+  @@index([positionKey])
+  @@index([locationKey])
 }
 
 model ScrapeLog {
@@ -48,7 +43,7 @@ model ScrapeLog {
   status       ScrapeStatus
   jobsFound    Int
   jobsAdded    Int
-  errorMessage String?      @db.Text
+  errorMessage String?
   durationMs   Int
   completedAt  DateTime     @default(now())
 
@@ -66,4 +61,16 @@ model User {
   updated_at DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+enum ScrapeStatus {
+  SUCCESS
+  FAILED
 }
