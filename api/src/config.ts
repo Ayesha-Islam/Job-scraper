@@ -42,7 +42,6 @@ export const env: Env = {
 
 const isPrismaHostedDb = env.DATABASE_URL.includes('db.prisma.io');
 const shouldUseSsl = env.NODE_ENV === 'production' || isPrismaHostedDb;
-
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
   ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,

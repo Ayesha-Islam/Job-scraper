@@ -19,23 +19,38 @@ function normalizePositionKey(position: string): string {
 function normalizeLocationKey(location: string | null | undefined): string {
   const raw = (location ?? 'remote').toLowerCase().trim();
 
+  const normalized = raw
+    .replace(/[🌏🌎🌍🇺🇸]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   if (
-    raw === '' ||
-    raw === 'remote' ||
-    raw === 'remote us' ||
-    raw === 'us remote' ||
-    raw === 'remote (us)' ||
-    raw === 'remote - us' ||
-    raw === 'remote - united states' ||
-    raw === 'united states' ||
-    raw === 'usa' ||
-    raw === 'us' ||
-    raw === 'anywhere'
+    normalized === '' ||
+    normalized === 'remote' ||
+    normalized === 'remote us' ||
+    normalized === 'us remote' ||
+    normalized === 'remote (us)' ||
+    normalized === 'remote - us' ||
+    normalized === 'remote - united states' ||
+    normalized === 'remote, usa' ||
+    normalized === 'remote usa' ||
+    normalized === 'remote worldwide' ||
+    normalized === 'fully remote' ||
+    normalized === '100% remote' ||
+    normalized === 'remote-first' ||
+    normalized === 'remote first' ||
+    normalized === 'distributed' ||
+    normalized === 'anywhere' ||
+    normalized === 'anywhere in the world' ||
+    normalized === 'worldwide' ||
+    normalized === 'probably worldwide' ||
+    normalized === 'global' ||
+    normalized === 'work from anywhere'
   ) {
     return 'remote';
   }
 
-  return raw;
+  return normalized || raw;
 }
 
 

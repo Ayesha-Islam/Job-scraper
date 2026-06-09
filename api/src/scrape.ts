@@ -1,7 +1,6 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
 import * as cheerio from 'cheerio';
 import chalk from 'chalk';
-import { createHash } from 'crypto';
 import https from 'https';
 import type { Prisma } from '@prisma/client';
 import { CacheService } from './cache';
@@ -34,13 +33,13 @@ export interface Job {
   id: string;
   title: string;
   company: string;
-  companyLogo?: string;
+  companyLogo?: string | undefined;
   location: string;
   isRemote: boolean;
-  timezone?: string;
-  salary?: string;
-  salaryMin?: number;
-  salaryMax?: number;
+  timezone?: string | undefined;
+  salary?: string | undefined;
+  salaryMin?: number | undefined;
+  salaryMax?: number | undefined;
   jobType: ScraperJobType;
   experienceLevel: ExperienceLevel;
   categories: string[];
@@ -62,7 +61,6 @@ export interface ScraperOptions {
   timeout?: number;
   userAgent?: string;
   maxRetries?: number;
-  outputDir?: string;
 }
 
 export interface ScraperResult {
@@ -94,7 +92,7 @@ const US_STATES = new Set([
 ]);
 
 const NON_US_COUNTRIES = [
-  'united kingdom', ' uk ', 'england', 'london', 'scotland', 'wales',
+  'united kingdom', 'uk', 'england', 'london', 'scotland', 'wales',
   'ireland', 'dublin', 'cork',
   'canada', 'toronto', 'vancouver', 'montreal', 'ontario', 'alberta',
   'british columbia', 'quebec', 'calgary', 'ottawa',
@@ -135,7 +133,7 @@ const REMOTE_KEYWORDS = [
   'wfh', 'fully remote', '100% remote', 'remote-first', 'remote first',
   'remote us', 'us remote', 'united states', 'usa only', 'us only',
   'usa', 'u.s.a', 'u.s.', 'north america', 'united states only',
-  'usa & canada', 'usa/canada', 'america',
+  'usa & canada', 'usa/canada',
 ];
 
 export function isUSOrRemoteJob(location: string, description = ''): boolean {
@@ -349,9 +347,9 @@ export function standardizePostedDate(raw: string | undefined, fallback: Date = 
 function buildJob(raw: {
   title: string;
   company: string;
-  companyLogo?: string;
+  companyLogo?: string | undefined;
   location?: string;
-  salary?: string;
+  salary?: string | undefined;
   jobType?: string;
   description?: string;
   postedDate?: string;
@@ -421,20 +419,37 @@ export function toDbJob(job: Job): Prisma.JobCreateInput {
   const positionKey = job.title.toLowerCase().trim();
   const locationKey = (() => {
     const raw = (job.location ?? 'remote').toLowerCase().trim();
+
+    const normalized = raw
+      .replace(/[🌏🌎🌍🇺🇸]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
     if (
-      raw === '' ||
-      raw === 'remote' ||
-      raw === 'remote us' ||
-      raw === 'us remote' ||
-      raw === 'remote (us)' ||
-      raw === 'remote - us' ||
-      raw === 'remote - united states' ||
-      raw === 'united states' ||
-      raw === 'usa' ||
-      raw === 'us' ||
-      raw === 'anywhere'
+      normalized === '' ||
+      normalized === 'remote' ||
+      normalized === 'remote us' ||
+      normalized === 'us remote' ||
+      normalized === 'remote (us)' ||
+      normalized === 'remote - us' ||
+      normalized === 'remote - united states' ||
+      normalized === 'remote, usa' ||
+      normalized === 'remote usa' ||
+      normalized === 'remote worldwide' ||
+      normalized === 'fully remote' ||
+      normalized === '100% remote' ||
+      normalized === 'remote-first' ||
+      normalized === 'remote first' ||
+      normalized === 'distributed' ||
+      normalized === 'anywhere' ||
+      normalized === 'anywhere in the world' ||
+      normalized === 'worldwide' ||
+      normalized === 'probably worldwide' ||
+      normalized === 'global' ||
+      normalized === 'work from anywhere'
     ) return 'remote';
-    return raw;
+
+    return normalized || raw;
   })();
 
   return {
@@ -466,7 +481,6 @@ abstract class JobBoardScraper {
       timeout: config.timeout ?? 60000,
       userAgent: config.userAgent ?? DEFAULT_UA,
       maxRetries: config.maxRetries ?? 3,
-      outputDir: config.outputDir ?? './scraped_jobs',
     };
   }
 
@@ -518,17 +532,6 @@ abstract class JobBoardScraper {
     return new Promise(r => setTimeout(r, ms));
   }
 
-  protected async withRetry<T>(fn: () => Promise<T>): Promise<T> {
-    for (let i = 0; i < this.config.maxRetries; i++) {
-      try { return await fn(); } catch (e) {
-        if (i === this.config.maxRetries - 1) throw e;
-        const wait = 2000 * (i + 1);
-        console.log(chalk.yellow(`  ⚠  Retry ${i + 1}/${this.config.maxRetries} in ${wait / 1000}s...`));
-        await this.sleep(wait);
-      }
-    }
-    throw new Error('All retries exhausted');
-  }
 
   protected pushIfValid(jobs: Job[], candidate: Job | null, fc: { n: number }): void {
     if (candidate) jobs.push(candidate);
@@ -946,13 +949,18 @@ export class JobDetailEnricher extends JobBoardScraper {
   async enrich(jobs: Job[], concurrency = 3): Promise<Job[]> {
     await this.initialize();
     const enriched: Job[] = [];
-    for (let i = 0; i < jobs.length; i += concurrency) {
-      const batch = jobs.slice(i, i + concurrency);
-      const results = await Promise.all(batch.map(j => this.enrichOne(j)));
-      enriched.push(...results);
+
+    try {
+      for (let i = 0; i < jobs.length; i += concurrency) {
+        const batch = jobs.slice(i, i + concurrency);
+        const results = await Promise.all(batch.map(j => this.enrichOne(j)));
+        enriched.push(...results);
+      }
+
+      return enriched;
+    } finally {
+      await this.close().catch(() => { /* ignore browser cleanup errors */ });
     }
-    await this.close();
-    return enriched;
   }
 
   private async enrichOne(job: Job): Promise<Job> {
@@ -1016,10 +1024,24 @@ export class JobDetailEnricher extends JobBoardScraper {
 }
 
 interface IJobService {
-  saveJobs(jobs: Prisma.JobCreateInput[]): Promise<{ added: number; duplicates: number; skipped: number }>;
+  saveJobs(jobs: Prisma.JobCreateInput[]): Promise<{
+    added: number;
+    duplicates: number;
+    skipped: number;
+    descriptionUpdated?: number;
+  }>;
 }
 
-type ScrapeJobConfig = { scraper: JobBoardScraper; query: string; pages?: number };
+type ScrapeJobConfig = {
+  source: string;
+  scraper: JobBoardScraper;
+  query: string;
+  pages?: number;
+};
+
+function normalizeSourceName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
 
 export class ScraperManager {
   private config: ScraperOptions;
@@ -1035,73 +1057,58 @@ export class ScraperManager {
 
   protected getScrapeJobs(): ScrapeJobConfig[] {
     return [
-      { scraper: new WeWorkRemotelyScraper(this.config), query: 'developer', pages: 2 },
-      { scraper: new RemoteOKScraper(this.config), query: 'developer', pages: 1 },
-      { scraper: new RemotiveScraper(this.config), query: 'engineer', pages: 1 },
-      { scraper: new YCombinatorScraper(this.config), query: 'software', pages: 1 },
-      { scraper: new NoDeskScraper(this.config), query: 'remote', pages: 2 },
-      { scraper: new HubstaffTalentScraper(this.config), query: 'developer', pages: 2 },
-      { scraper: new SkipTheDriveScraper(this.config), query: 'developer', pages: 1 },
-      { scraper: new RemoteHubScraper(this.config), query: 'developer', pages: 1 },
-      { scraper: new LinkedInScraper(this.config), query: 'software engineer', pages: 2 },
+      { source: 'We Work Remotely', scraper: new WeWorkRemotelyScraper(this.config), query: 'developer', pages: 2 },
+      { source: 'RemoteOK', scraper: new RemoteOKScraper(this.config), query: 'developer', pages: 1 },
+      { source: 'Remotive', scraper: new RemotiveScraper(this.config), query: 'engineer', pages: 1 },
+      { source: 'Y Combinator', scraper: new YCombinatorScraper(this.config), query: 'software', pages: 1 },
+      { source: 'NoDesk', scraper: new NoDeskScraper(this.config), query: 'remote', pages: 2 },
+      { source: 'Hubstaff Talent', scraper: new HubstaffTalentScraper(this.config), query: 'developer', pages: 2 },
+      { source: 'SkipTheDrive', scraper: new SkipTheDriveScraper(this.config), query: 'developer', pages: 1 },
+      { source: 'RemoteHub', scraper: new RemoteHubScraper(this.config), query: 'developer', pages: 1 },
+      { source: 'LinkedIn', scraper: new LinkedInScraper(this.config), query: 'software engineer', pages: 2 },
     ];
   }
 
-  private normalizeSourceName(value: string): string {
-    return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+  private findScrapeJob(source: string): ScrapeJobConfig | null {
+    const requested = normalizeSourceName(source);
+
+    return this.getScrapeJobs().find(job => {
+      const displayName = normalizeSourceName(job.source);
+      const className = normalizeSourceName((job.scraper as any).constructor?.name ?? '').replace(/scraper$/, '');
+      return displayName === requested || className === requested;
+    }) ?? null;
   }
 
-  private getSourceName(scraper: JobBoardScraper): string {
-    const className = (scraper as any).constructor?.name ?? 'Unknown';
-    const sourceNames: Record<string, string> = {
-      WeWorkRemotelyScraper: 'We Work Remotely',
-      RemoteOKScraper: 'RemoteOK',
-      RemotiveScraper: 'Remotive',
-      YCombinatorScraper: 'Y Combinator',
-      NoDeskScraper: 'NoDesk',
-      HubstaffTalentScraper: 'Hubstaff Talent',
-      SkipTheDriveScraper: 'SkipTheDrive',
-      RemoteHubScraper: 'RemoteHub',
-      LinkedInScraper: 'LinkedIn',
-    };
-    return sourceNames[className] ?? className.replace(/Scraper$/, '');
+  private async enrichJobs(source: string, jobs: Job[]): Promise<Job[]> {
+    if (jobs.length === 0) return jobs;
+
+    const enricher = new JobDetailEnricher(this.config);
+    try {
+      console.log(chalk.dim('  ⤷ Enriching job details (fetching full descriptions)...'));
+      const enriched = await enricher.enrich(jobs, 3);
+      console.log(chalk.dim(`  ⤷ Enrichment complete: ${enriched.length} jobs`));
+      return enriched;
+    } catch (e: any) {
+      console.warn(chalk.yellow(`  ⚠ ${source} enrichment failed: ${e?.message || e}`));
+      return jobs;
+    }
   }
 
-  private matchesSource(scraper: JobBoardScraper, requestedSource: string): boolean {
-    const requested = this.normalizeSourceName(requestedSource);
-    const sourceName = this.normalizeSourceName(this.getSourceName(scraper));
-    const className = this.normalizeSourceName((scraper as any).constructor?.name ?? '');
-    const shortClassName = this.normalizeSourceName(((scraper as any).constructor?.name ?? '').replace(/Scraper$/, ''));
-
-    return requested === sourceName || requested === className || requested === shortClassName;
-  }
-
-  private async runScrapeJob({ scraper, query, pages }: ScrapeJobConfig): Promise<ScrapeRunResult> {
-    const name = (scraper as any).constructor?.name ?? 'Unknown';
-    console.log(chalk.blue(`
-▶ ${name}  query="${query}"  pages=${pages ?? 1}`));
+  private async runScrapeJob(job: ScrapeJobConfig): Promise<ScrapeRunResult> {
+    const { scraper, query, pages, source } = job;
+    const name = (scraper as any).constructor?.name ?? source;
+    console.log(chalk.blue(`\n▶ ${name}  query="${query}"  pages=${pages ?? 1}`));
 
     try {
       const result = await scraper.scrape(query, pages);
-
-      let jobsToSave = result.jobs;
-      if (jobsToSave.length > 0) {
-        try {
-          const enricher = new JobDetailEnricher(this.config);
-          console.log(chalk.dim('  ⤷ Enriching job details (fetching full descriptions)...'));
-          jobsToSave = await enricher.enrich(jobsToSave, 3);
-          console.log(chalk.dim(`  ⤷ Enrichment complete: ${jobsToSave.length} jobs`));
-        } catch (e: any) {
-          console.warn(chalk.yellow(`  ⚠ Job detail enrichment failed: ${e?.message || e}`));
-        }
-      }
-
+      const jobsToSave = await this.enrichJobs(result.source, result.jobs);
       const dbJobs = jobsToSave.map(toDbJob);
       const { added, duplicates } = await this.jobService.saveJobs(dbJobs);
 
       console.log(chalk.green(
         `  ✔ ${result.source}: found=${result.jobs.length} added=${added} dup=${duplicates} filtered=${result.filtered} time=${(result.durationMs / 1000).toFixed(1)}s`
       ));
+
       if (result.errors.length > 0) {
         result.errors.forEach(e => console.warn(chalk.yellow(`  ⚠  ${e}`)));
       }
@@ -1118,8 +1125,9 @@ export class ScraperManager {
     } catch (e: any) {
       const msg = e?.message || String(e);
       console.error(chalk.red(`  ✖ ${name} failed: ${msg}`));
+
       return {
-        source: this.getSourceName(scraper),
+        source,
         jobsFound: 0,
         jobsAdded: 0,
         jobsDuplicate: 0,
@@ -1143,7 +1151,7 @@ export class ScraperManager {
     const totalFiltered = results.reduce((s, r) => s + r.jobsFiltered, 0);
     const errCount = results.filter(r => r.status === 'FAILED').length;
 
-    console.log(chalk.bold.cyan('══════════════════════════════════════════════'));
+    console.log(chalk.bold.cyan('\n══════════════════════════════════════════════'));
     console.log(chalk.bold.cyan('  SCRAPE COMPLETE  (US Remote jobs only)'));
     console.log(chalk.bold.cyan('══════════════════════════════════════════════'));
     console.log(chalk.white(`  Sources:         ${results.length}`));
@@ -1151,22 +1159,28 @@ export class ScraperManager {
     console.log(chalk.green(`  Added to DB:     ${totalAdded}`));
     console.log(chalk.yellow(`  Non-US filtered: ${totalFiltered}`));
     if (errCount > 0) console.log(chalk.red(`  Errors:          ${errCount} source(s) failed`));
-    console.log(chalk.bold.cyan('══════════════════════════════════════════════'));
+    console.log(chalk.bold.cyan('══════════════════════════════════════════════\n'));
 
     return results;
   }
 
   async runOne(source: string): Promise<ScrapeRunResult> {
-    const scrapeJob = this.getScrapeJobs().find(({ scraper }) => this.matchesSource(scraper, source));
+    const match = this.findScrapeJob(source);
 
-    if (!scrapeJob) {
-      const availableSources = this.getScrapeJobs()
-        .map(({ scraper }) => this.getSourceName(scraper))
-        .join(', ');
-      throw new Error(`Source "${source}" not found. Available sources: ${availableSources}`);
+    if (!match) {
+      return {
+        source,
+        jobsFound: 0,
+        jobsAdded: 0,
+        jobsDuplicate: 0,
+        jobsFiltered: 0,
+        status: 'FAILED',
+        error: `Unknown scraper source: ${source}`,
+        duration: 0,
+      };
     }
 
-    return await this.runScrapeJob(scrapeJob);
+    return this.runScrapeJob(match);
   }
 }
 
