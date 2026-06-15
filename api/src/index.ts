@@ -20,7 +20,6 @@ async function startServer() {
       console.log(chalk.cyan(`   http://localhost:${PORT}`));
       console.log(chalk.cyan(`   Health: http://localhost:${PORT}/api/v1/health`));
       console.log(chalk.cyan(`   Jobs: http://localhost:${PORT}/api/v1/jobs`));
-      console.log(chalk.green('✓ Scheduler initialized'));
     });
 
     server.on('error', (error: any) => {

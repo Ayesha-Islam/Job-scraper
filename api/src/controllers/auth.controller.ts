@@ -1,17 +1,3 @@
-/**
- * auth.controller.ts
- *
- * Migration: raw pg Pool → Prisma
- *
- * Why:
- *   - Auth is simple CRUD on a single table — Prisma is the correct layer
- *   - Prisma gives typed return values, no manual column mapping
- *   - Prisma's P2002 unique-constraint error replaces the manual SELECT before INSERT
- *   - Removes the need to inject Pool into this controller entirely
- *
- * API contract: unchanged — same request shape, same response shape.
- */
-
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';

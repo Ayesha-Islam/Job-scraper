@@ -1,13 +1,3 @@
-/**
- * container.ts
- *
- * Change from previous refactor:
- *   - AuthController now receives `db` (PrismaClient) instead of `pool` (pg Pool)
- *     This completes the auth migration: auth CRUD → Prisma, search/analytics → SQL
- *   - `pool` getter remains for job.sql.ts (search + stats layer)
- *   - Everything else unchanged
- */
-
 import { env, pool, type Env } from './config';
 import IORedis from 'ioredis';
 import { Pool } from 'pg';

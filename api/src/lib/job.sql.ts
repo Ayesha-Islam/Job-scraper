@@ -1,21 +1,6 @@
-/**
- * job.sql.ts — RAW SQL LAYER
- *
- * Owns ALL performance-critical queries:
- *   - job search with full-text + filter + sort + pagination
- *   - stats aggregations (count, groupBy)
- *
- * RULES:
- *   - NO business logic here — only query construction and execution
- *   - NO Prisma imports
- *   - Returns plain typed objects only
- */
-
 import { Pool } from 'pg';
 import { JobFilters, PaginatedResponse, JobStats } from '../types';
 import type { Job } from '@prisma/client';
-
-// ─── Search + Filter + Sort + Paginate ────────────────────────────────────────
 
 export async function queryJobs(
   pool: Pool,
@@ -25,7 +10,6 @@ export async function queryJobs(
 ): Promise<PaginatedResponse<Job>> {
   const offset = (page - 1) * limit;
 
-  // Accumulate WHERE clauses and params together so numbering is always correct
   const conditions: string[] = ['"isActive" = true'];
   const params: any[] = [];
 
@@ -33,7 +17,6 @@ export async function queryJobs(
     const term = `%${filters.search.trim()}%`;
     params.push(term);
     const n = params.length;
-    // Single param reused across four ILIKE checks — safe because value is identical
     conditions.push(
       `(position ILIKE $${n} OR company ILIKE $${n} OR location ILIKE $${n} OR description ILIKE $${n})`
     );
@@ -61,18 +44,15 @@ export async function queryJobs(
 
   const whereClause = conditions.join(' AND ');
 
-  // Sort — whitelist only, never interpolate user input directly
   const orderByMap: Record<string, string> = {
-    recent:  '"createdAt" DESC',
-    oldest:  '"createdAt" ASC',
-    salary:  'salary DESC NULLS LAST',
+    recent: '"createdAt" DESC',
+    oldest: '"createdAt" ASC',
+    salary: 'salary DESC NULLS LAST',
   };
   const orderBy = orderByMap[filters.sortBy ?? 'recent'] ?? orderByMap.recent;
 
-  // Count query (same WHERE, no ORDER/LIMIT)
   const countSql = `SELECT COUNT(*)::int AS total FROM "Job" WHERE ${whereClause}`;
 
-  // Data query
   params.push(limit, offset);
   const dataSql = `
     SELECT *
@@ -83,7 +63,6 @@ export async function queryJobs(
     OFFSET $${params.length}
   `;
 
-  // Run both in parallel — count uses same params minus the last two
   const countParams = params.slice(0, params.length - 2);
   const [dataResult, countResult] = await Promise.all([
     pool.query(dataSql, params),
@@ -102,12 +81,6 @@ export async function queryJobs(
     },
   };
 }
-
-// ─── Single Job Lookup ─────────────────────────────────────────────────────────
-// NOTE: getJobById stays in Prisma (simple pk lookup). This fn is not needed,
-// but kept as a slot for future raw-SQL needs (e.g. joins with SavedJob counts).
-
-// ─── Analytics / Stats ────────────────────────────────────────────────────────
 
 export async function queryJobStats(pool: Pool): Promise<JobStats> {
   const today = new Date();
@@ -138,9 +111,9 @@ export async function queryJobStats(pool: Pool): Promise<JobStats> {
   ]);
 
   return {
-    total:      totalResult.rows[0]?.total      ?? 0,
+    total: totalResult.rows[0]?.total ?? 0,
     addedToday: todayResult.rows[0]?.added_today ?? 0,
-    bySource:   bySourceResult.rows,
-    byType:     byTypeResult.rows,
+    bySource: bySourceResult.rows,
+    byType: byTypeResult.rows,
   };
 }

@@ -5,6 +5,7 @@ import https from 'https';
 import type { Prisma } from '@prisma/client';
 import { CacheService } from './cache';
 import { JobService } from './services/job.svc';
+import { JobProcessor, type JobProcessResult } from './services/job.processor';
 import { db } from './lib/prisma';
 import container from './container';
 
@@ -136,25 +137,30 @@ const REMOTE_KEYWORDS = [
   'usa & canada', 'usa/canada',
 ];
 
-export function isUSOrRemoteJob(location: string, description = ''): boolean {
-  const loc = location.toLowerCase().trim();
-  const combined = `${loc} ${description.toLowerCase()}`;
+export function isUSOrRemoteJob(location: string, _description = ''): boolean {
+  const rawLoc = location || '';
+  const loc = rawLoc
+    .toLowerCase()
+    .replace(/[🌏🌎🌍🇺🇸]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  if (REMOTE_KEYWORDS.some(kw => combined.includes(kw))) return true;
-
-  const stateMatches = location.match(/\b([A-Z]{2})\b/g);
-  if (stateMatches && stateMatches.some(s => US_STATES.has(s))) return true;
-
-  if (/\b(united states|usa|u\.s\.|new york|san francisco|los angeles|chicago|seattle|boston|austin|denver|atlanta|miami|dallas|houston|new jersey|washington dc|washington d\.c)\b/.test(loc)) {
-    return true;
-  }
-
-  if (NON_US_COUNTRIES.some(c => {
+  const containsNonUsLocation = NON_US_COUNTRIES.some(c => {
     if (c.length <= 3) return new RegExp(`\\b${c}\\b`, 'i').test(loc);
     return loc.includes(c);
-  })) return false;
+  });
 
-  return true;
+  const stateMatches = rawLoc.match(/\b([A-Z]{2})\b/g);
+  const hasUsState = Boolean(stateMatches && stateMatches.some(s => US_STATES.has(s)));
+
+  const hasExplicitUsLocation =
+    /\b(united states|usa|u\.s\.|us only|usa only|united states only|remote us|us remote|remote \(us\)|remote - us|remote - united states|remote, usa|usa & canada|usa\/canada|north america|new york|san francisco|los angeles|chicago|seattle|boston|austin|denver|atlanta|miami|dallas|houston|new jersey|washington dc|washington d\.c)\b/.test(loc) ||
+    hasUsState;
+
+  if (hasExplicitUsLocation) return true;
+  if (containsNonUsLocation) return false;
+
+  return false;
 }
 
 export function cleanHtml(raw: string): string {
@@ -368,8 +374,6 @@ function buildJob(raw: {
   const jobType = raw.jobType ? inferJobType(raw.jobType) : inferJobType(fullText);
   const location = cleanHtml(raw.location || 'Remote').trim() || 'Remote';
 
-  if (!isUSOrRemoteJob(location, description)) return null;
-
   return {
     id: makeJobId(raw.url, title, company),
     title,
@@ -531,7 +535,6 @@ abstract class JobBoardScraper {
   protected sleep(ms: number): Promise<void> {
     return new Promise(r => setTimeout(r, ms));
   }
-
 
   protected pushIfValid(jobs: Job[], candidate: Job | null, fc: { n: number }): void {
     if (candidate) jobs.push(candidate);
@@ -941,95 +944,15 @@ export class LinkedInScraper extends JobBoardScraper {
   }
 }
 
-export class JobDetailEnricher extends JobBoardScraper {
-  async scrape(_query: string, _pages?: number): Promise<ScraperResult> {
-    return { source: 'JobDetailEnricher', jobs: [], scrapedAt: new Date().toISOString(), durationMs: 0, errors: [], filtered: 0 };
-  }
-
-  async enrich(jobs: Job[], concurrency = 3): Promise<Job[]> {
-    await this.initialize();
-    const enriched: Job[] = [];
-
-    try {
-      for (let i = 0; i < jobs.length; i += concurrency) {
-        const batch = jobs.slice(i, i + concurrency);
-        const results = await Promise.all(batch.map(j => this.enrichOne(j)));
-        enriched.push(...results);
-      }
-
-      return enriched;
-    } finally {
-      await this.close().catch(() => { /* ignore browser cleanup errors */ });
-    }
-  }
-
-  private async enrichOne(job: Job): Promise<Job> {
-    const page = await this.createPage();
-    try {
-      await page.goto(job.url, { waitUntil: 'networkidle2', timeout: this.config.timeout });
-      await this.sleep(800);
-
-      const rawHtml = await page.evaluate((source: string) => {
-        const SOURCE_SELECTORS: Record<string, string[]> = {
-          'We Work Remotely': ['.listing-container', '[class*="listing-container"]', 'article'],
-          'RemoteOK': ['.markdown', '#job-description', 'td.markdown', '[id*="job"]'],
-          'Remotive': ['.job-description', '[class*="job-description"]'],
-          'Working Nomads': ['.job-description', '[class*="description"]', 'article', 'main'],
-          'Y Combinator': ['.prose', '[class*="description"]', 'main'],
-          'NoDesk': ['article.job', '.job-description', '[class*="content"]', 'main'],
-          'Hubstaff Talent': ['.job-description', '.description', '[class*="description"]'],
-          'SkipTheDrive': ['.entry-content', '.post-content', 'article', 'main'],
-          'Jobspresso': ['.job_description', '[class*="description"]', '.entry-content'],
-          'RemoteHub': ['.job-description', '.description', '[class*="description"]'],
-          'LinkedIn': ['.description__text', '.show-more-less-html__markup', '[class*="description"]'],
-        };
-
-        const GENERIC_FALLBACK = [
-          '[class*="job-description"]',
-          '[class*="jobDescription"]',
-          '[class*="job-detail"]',
-          '[class*="job_description"]',
-          'article',
-          'main',
-        ];
-
-        const selectors = [...(SOURCE_SELECTORS[source] || []), ...GENERIC_FALLBACK];
-
-        for (const sel of selectors) {
-          const el = document.querySelector(sel);
-          if (el && el.textContent && el.textContent.trim().length > 200) {
-            return el.innerHTML;
-          }
-        }
-        return document.body.innerHTML;
-      }, job.source);
-
-      const enrichedDescription = cleanDescription(cleanHtml(rawHtml));
-      const enrichedIsValid = isLikelyRealDescription(enrichedDescription);
-
-      const useEnriched = enrichedIsValid && enrichedDescription.length > (job.description?.length ?? 0);
-      const finalDescription = useEnriched ? enrichedDescription : (job.description || enrichedDescription);
-      const descToUse = finalDescription || job.description || '';
-
-      return {
-        ...job,
-        description: descToUse,
-        requirements: extractBulletSection(descToUse, ['Requirements', 'Qualifications', 'What you need', 'Must have', 'Skills required']),
-        responsibilities: extractBulletSection(descToUse, ['Responsibilities', 'What you will do', 'You will', 'Role', 'The role']),
-        techStack: extractTechStack(descToUse),
-        benefits: extractBenefits(descToUse),
-      };
-    } catch { return job; } finally { await page.close(); }
-  }
-}
 
 interface IJobService {
   saveJobs(jobs: Prisma.JobCreateInput[]): Promise<{
     added: number;
     duplicates: number;
     skipped: number;
-    descriptionUpdated?: number;
+    descriptionUpdated: number;
   }>;
+  cleanupBadDescriptions(): Promise<{ updated: number; cleared: number }>;
 }
 
 type ScrapeJobConfig = {
@@ -1045,6 +968,7 @@ function normalizeSourceName(value: string): string {
 
 export class ScraperManager {
   private config: ScraperOptions;
+  private processor: JobProcessor;
 
   constructor(
     _container: any,
@@ -1053,6 +977,7 @@ export class ScraperManager {
     config: ScraperOptions = {}
   ) {
     this.config = config;
+    this.processor = new JobProcessor(this.jobService, this.config);
   }
 
   protected getScrapeJobs(): ScrapeJobConfig[] {
@@ -1079,18 +1004,18 @@ export class ScraperManager {
     }) ?? null;
   }
 
-  private async enrichJobs(source: string, jobs: Job[]): Promise<Job[]> {
-    if (jobs.length === 0) return jobs;
+  private printProcessSummary(source: string, result: ScraperResult, processed: JobProcessResult): void {
+    const skipSummary = Object.entries(processed.skipReasons)
+      .filter(([, count]) => count > 0)
+      .map(([reason, count]) => `${reason}=${count}`)
+      .join(' ');
 
-    const enricher = new JobDetailEnricher(this.config);
-    try {
-      console.log(chalk.dim('  ⤷ Enriching job details (fetching full descriptions)...'));
-      const enriched = await enricher.enrich(jobs, 3);
-      console.log(chalk.dim(`  ⤷ Enrichment complete: ${enriched.length} jobs`));
-      return enriched;
-    } catch (e: any) {
-      console.warn(chalk.yellow(`  ⚠ ${source} enrichment failed: ${e?.message || e}`));
-      return jobs;
+    console.log(chalk.green(
+      `  ✔ ${source}: found=${result.jobs.length} added=${processed.added} dup=${processed.duplicates} skipped=${processed.skipped} descUpdated=${processed.descriptionUpdated} filtered=${processed.filtered} enriched=${processed.enriched} enrichFailed=${processed.enrichmentFailed} avgChars=${processed.avgDescriptionChars} time=${(result.durationMs / 1000).toFixed(1)}s`
+    ));
+
+    if (skipSummary) {
+      console.log(chalk.gray(`     skip reasons: ${skipSummary}`));
     }
   }
 
@@ -1101,13 +1026,9 @@ export class ScraperManager {
 
     try {
       const result = await scraper.scrape(query, pages);
-      const jobsToSave = await this.enrichJobs(result.source, result.jobs);
-      const dbJobs = jobsToSave.map(toDbJob);
-      const { added, duplicates } = await this.jobService.saveJobs(dbJobs);
+      const processed = await this.processor.process(result.jobs, result.source);
 
-      console.log(chalk.green(
-        `  ✔ ${result.source}: found=${result.jobs.length} added=${added} dup=${duplicates} filtered=${result.filtered} time=${(result.durationMs / 1000).toFixed(1)}s`
-      ));
+      this.printProcessSummary(result.source, result, processed);
 
       if (result.errors.length > 0) {
         result.errors.forEach(e => console.warn(chalk.yellow(`  ⚠  ${e}`)));
@@ -1116,9 +1037,9 @@ export class ScraperManager {
       return {
         source: result.source,
         jobsFound: result.jobs.length,
-        jobsAdded: added,
-        jobsDuplicate: duplicates,
-        jobsFiltered: result.filtered,
+        jobsAdded: processed.added,
+        jobsDuplicate: processed.duplicates,
+        jobsFiltered: processed.filtered,
         status: 'SUCCESS',
         duration: result.durationMs,
       };
@@ -1157,7 +1078,7 @@ export class ScraperManager {
     console.log(chalk.white(`  Sources:         ${results.length}`));
     console.log(chalk.white(`  Jobs found:      ${totalFound}`));
     console.log(chalk.green(`  Added to DB:     ${totalAdded}`));
-    console.log(chalk.yellow(`  Non-US filtered: ${totalFiltered}`));
+    console.log(chalk.yellow(`  Filtered:        ${totalFiltered}`));
     if (errCount > 0) console.log(chalk.red(`  Errors:          ${errCount} source(s) failed`));
     console.log(chalk.bold.cyan('══════════════════════════════════════════════\n'));
 
@@ -1215,7 +1136,7 @@ async function main() {
   const jobService = new JobService(container, cache);
   const manager = new ScraperManager(null, null, jobService, { headless: true } as ScraperOptions);
 
-  console.log(chalk.cyan('Starting scrape run across 11 job boards...\n'));
+  console.log(chalk.cyan('Starting scrape run across 9 job boards...\n'));
   const t0 = Date.now();
 
   let results: ScrapeRunResult[] = [];

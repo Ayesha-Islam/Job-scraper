@@ -1,15 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Container } from '../container';
 
-/**
- * Central API route registry.
- *
- * Notes:
- * - All public API routes are mounted under /api/v1.
- * - Health also keeps legacy /health aliases so existing checks keep working.
- * - Manual scrape is POST-only. A GET handler returns 405 to make browser/Postman
- *   mistakes obvious instead of looking like a missing route.
- */
 export function createRoutes(container: Container): Router {
   const router = Router();
   const API_V1 = '/api/v1';
