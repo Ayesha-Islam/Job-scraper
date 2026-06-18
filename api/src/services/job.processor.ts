@@ -4,7 +4,13 @@ import chalk from 'chalk';
 import type { Prisma } from '@prisma/client';
 import type { Job, ScraperOptions } from '../scrape';
 
-const DEBUG = process.env.DEBUG === 'true';
+const TRACE = process.env.TRACE === 'true';
+const DEBUG = process.env.DEBUG === 'true' || TRACE;
+
+const LINKEDIN_SOURCE = 'LinkedIn';
+const LINKEDIN_MIN_PRESERVE_CHARS = 220;
+const LINKEDIN_MIN_REPLACEMENT_CHARS = 300;
+const LINKEDIN_MIN_REPLACEMENT_GAIN = 120;
 
 export type SkipReason =
   | 'missing_required_field'
@@ -18,6 +24,16 @@ export type SkipReason =
   | 'non_us_restricted'
   | 'missing_us_signal';
 
+export interface SourceQualityMetrics {
+  badDescriptions: number;
+  missingCompany: number;
+  missingLocation: number;
+  enrichmentFailures: number;
+  warningRate: number;
+  rejectionRate: number;
+  duplicateRate: number;
+}
+
 export interface JobProcessResult {
   found: number;
   enriched: number;
@@ -29,6 +45,10 @@ export interface JobProcessResult {
   filtered: number;
   descriptionUpdated: number;
   skipReasons: Record<SkipReason, number>;
+  extractionMethods: Record<string, number>;
+  warnings: string[];
+  dbErrors: number;
+  quality: SourceQualityMetrics;
 }
 
 interface JobServiceLike {
@@ -123,9 +143,86 @@ const SOURCE_SELECTORS: Record<string, string[]> = {
   ],
   'Hubstaff Talent': ['.job-description', '.description', '[class*="description"]', 'main', 'article'],
   SkipTheDrive: ['.entry-content', '.post-content', 'article', 'main'],
-  RemoteHub: ['.job-description', '.description', '[class*="description"]', 'main', 'article'],
-  LinkedIn: ['.description__text', '.show-more-less-html__markup', '[class*="description"]', 'main'],
+  RemoteHub: [
+    '[class*="job-description"]',
+    '[class*="job-content"]',
+    '[class*="description"]',
+    '[class*="vacancy"]',
+    '[class*="details"]',
+    'article',
+    'main',
+  ],
+  LinkedIn: [
+    '.show-more-less-html__markup',
+    '.description__text',
+    '.jobs-description__content',
+    '.jobs-description-content__text',
+    '.jobs-box__html-content',
+    '.jobs-description',
+    '.job-details-jobs-unified-top-card__job-description',
+    '[data-test-job-description]',
+    '[class*="jobs-description"]',
+    '[class*="show-more-less-html"]',
+    '[class*="job-description"]',
+    '[class*="description"]',
+    'main',
+  ],
 };
+
+const NO_GENERIC_DIV_FALLBACK_SOURCES = new Set([
+  'NoDesk',
+  'Hubstaff Talent',
+  'SkipTheDrive'
+]);
+
+function shouldUseGenericFallback(source: string): boolean {
+  return !NO_GENERIC_DIV_FALLBACK_SOURCES.has(source);
+}
+
+function extractionMethodKey(selector?: string): string {
+  return selector?.trim() || 'unknown';
+}
+
+type SourcePolicy = {
+  enrich: boolean;
+  concurrency: number;
+  maxEnrich: number;
+  attempts: number;
+  warnWhenDisabled?: boolean;
+};
+
+const DEFAULT_SOURCE_POLICY: SourcePolicy = {
+  enrich: true,
+  concurrency: 2,
+  maxEnrich: 25,
+  attempts: 1,
+};
+
+const SOURCE_POLICIES: Record<string, SourcePolicy> = {
+  // RSS/API sources already provide usable descriptions; enrichment would only waste CPU.
+  'We Work Remotely': { enrich: false, concurrency: 1, maxEnrich: 20, attempts: 1, warnWhenDisabled: false },
+  Remotive: { enrich: false, concurrency: 1, maxEnrich: 30, attempts: 1, warnWhenDisabled: false },
+
+  // Reliable JSON-LD/detail pages.
+  RemoteOK: { enrich: true, concurrency: 1, maxEnrich: 20, attempts: 1 },
+  'Y Combinator': { enrich: true, concurrency: 2, maxEnrich: 20, attempts: 1 },
+  LinkedIn: { enrich: true, concurrency: 1, maxEnrich: 30, attempts: 1 },
+  SkipTheDrive: { enrich: true, concurrency: 1, maxEnrich: 20, attempts: 1 },
+
+  // Keep resource usage low on laptop.
+  'Hubstaff Talent': { enrich: true, concurrency: 1, maxEnrich: 30, attempts: 1 },
+  RemoteHub: { enrich: true, concurrency: 1, maxEnrich: 30, attempts: 1 },
+
+  // NoDesk is intentionally experimental. The listing page has no real descriptions,
+  // and detail pages repeatedly return template/bad-scrape text. Keep it out of
+  // production runs unless ENABLE_EXPERIMENTAL_SOURCES=true is used in scrape.ts.
+  NoDesk: { enrich: false, concurrency: 1, maxEnrich: 0, attempts: 0, warnWhenDisabled: false },
+};
+
+function getSourcePolicy(source: string): SourcePolicy {
+  return SOURCE_POLICIES[source] ?? DEFAULT_SOURCE_POLICY;
+}
+
 
 function emptySkipReasons(): Record<SkipReason, number> {
   return {
@@ -145,6 +242,29 @@ function emptySkipReasons(): Record<SkipReason, number> {
 function inc(stats: JobProcessResult, reason: SkipReason): void {
   stats.skipped++;
   stats.skipReasons[reason]++;
+}
+
+function calculateQuality(stats: JobProcessResult, missingCompany: number, missingLocation: number): SourceQualityMetrics {
+  const badDescriptions =
+    stats.skipReasons.description_empty +
+    stats.skipReasons.description_too_short +
+    stats.skipReasons.description_nav_text +
+    stats.skipReasons.description_missing_job_keywords +
+    stats.skipReasons.description_bad_scrape;
+
+  const warnings = stats.warnings.length;
+  const found = stats.found || 0;
+  const rejectionCount = stats.skipped + stats.filtered + stats.duplicates;
+
+  return {
+    badDescriptions,
+    missingCompany,
+    missingLocation,
+    enrichmentFailures: stats.enrichmentFailed,
+    warningRate: found > 0 ? Number((warnings / found).toFixed(3)) : 0,
+    rejectionRate: found > 0 ? Number((rejectionCount / found).toFixed(3)) : 0,
+    duplicateRate: found > 0 ? Number((stats.duplicates / found).toFixed(3)) : 0,
+  };
 }
 
 function removeEmoji(text: string): string {
@@ -253,6 +373,15 @@ function isBadScrapedDescription(description: string, company: string): boolean 
   if (text.includes('about fluidstack') && companyKey !== 'fluidstack') return true;
   if (text.includes('remote jobs for digital working nomads') && !text.includes(companyKey)) return true;
   if (text.includes('find the best remote jobs') && !text.includes(companyKey)) return true;
+
+  // Cloudflare / anti-bot / infrastructure pages should never be stored as job descriptions.
+  if (/error\s+10\d{2}/i.test(description)) return true;
+  if (/ray\s+id|cloudflare|you are being rate limited|access denied|attention required/i.test(description)) return true;
+  if (/enable javascript and cookies to continue/i.test(description)) return true;
+
+  // NoDesk sometimes returns a repeated listing/template block instead of the target job.
+  if (/remote jobs for digital working nomads|find the best remote jobs/i.test(text) && !text.includes(companyKey)) return true;
+
   return false;
 }
 
@@ -269,6 +398,38 @@ function validateDescription(description: string, company: string, title = ''): 
   if (!textLooksLikeJobDescription(cleaned, title)) return { ok: false, reason: 'description_missing_job_keywords' };
 
   return { ok: true };
+}
+
+function isLinkedInSource(source: string): boolean {
+  return source.trim().toLowerCase() === LINKEDIN_SOURCE.toLowerCase();
+}
+
+function hasUsableDescription(job: Job, description: string, minChars = 80): boolean {
+  const cleaned = cleanDescription(description);
+  return cleaned.length >= minChars && validateDescription(cleaned, job.company, job.title).ok;
+}
+
+function shouldAcceptEnrichedDescription(job: Job, currentDescription: string, enrichedDescription: string): boolean {
+  const current = cleanDescription(currentDescription);
+  const enriched = cleanDescription(enrichedDescription);
+
+  if (!hasUsableDescription(job, enriched, LINKEDIN_MIN_REPLACEMENT_CHARS)) {
+    return false;
+  }
+
+  if (!isLinkedInSource(job.source)) {
+    return enriched.length > current.length;
+  }
+
+  const currentIsUsable = hasUsableDescription(job, current, LINKEDIN_MIN_PRESERVE_CHARS);
+
+  if (!currentIsUsable) {
+    return enriched.length >= Math.max(current.length, LINKEDIN_MIN_REPLACEMENT_CHARS);
+  }
+
+  // LinkedIn frequently returns truncated, login, or generic pages during enrichment.
+  // Only replace a usable LinkedIn description when the new text is clearly better.
+  return enriched.length >= current.length + LINKEDIN_MIN_REPLACEMENT_GAIN;
 }
 
 function validateUSRemote(job: Job): ValidationResult {
@@ -405,7 +566,7 @@ class DetailExtractor {
     await page.setRequestInterception(true);
     page.on('request', req => {
       const rt = req.resourceType();
-      if (['image', 'media', 'font'].includes(rt)) req.abort();
+      if (['image', 'media', 'font', 'stylesheet'].includes(rt)) req.abort();
       else req.continue();
     });
 
@@ -487,12 +648,14 @@ class DetailExtractor {
       $(sel).each((_, el) => pushCandidate(el, sel));
     }
 
-    $('article, main, section, div').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text.length >= 300) {
-        pushCandidate(el, (el as any).tagName?.toLowerCase?.() || 'container');
-      }
-    });
+    if (shouldUseGenericFallback(source)) {
+      $('article, main, section, div').each((_, el) => {
+        const text = $(el).text().trim();
+        if (text.length >= 300) {
+          pushCandidate(el, (el as any).tagName?.toLowerCase?.() || 'container');
+        }
+      });
+    }
 
     candidates.sort((a, b) => b.score - a.score);
     const best = candidates[0];
@@ -500,6 +663,66 @@ class DetailExtractor {
     return best
       ? { html: best.html, selector: best.selector, score: best.score }
       : { html: '', selector: '', score: 0 };
+  }
+
+  private extractLinkedInFallbackFromHtml(html: string, job: Job): { description: string; selector: string; chars: number } {
+    const $ = cheerio.load(html);
+    const candidates: Array<{ description: string; selector: string; score: number }> = [];
+
+    const push = (raw: string, selector: string): void => {
+      const description = cleanDescription(cleanHtml(raw));
+      if (description.length < LINKEDIN_MIN_REPLACEMENT_CHARS) return;
+      if (!textLooksLikeJobDescription(description, job.title)) return;
+      if (isBadScrapedDescription(description, job.company)) return;
+
+      let score = description.length;
+      if (/responsibilit|requirement|qualification|about the role|you will|what you/i.test(description)) {
+        score += 1500;
+      }
+      if (/sign in|join linkedin|people also viewed|similar jobs|jobs you may be interested/i.test(description)) {
+        score -= 3000;
+      }
+
+      candidates.push({ description, selector, score });
+    };
+
+    $('meta[name="description"], meta[property="og:description"]').each((_, el) => {
+      push($(el).attr('content') || '', 'linkedin:meta-description');
+    });
+
+    $(
+      [
+        '.show-more-less-html__markup',
+        '.jobs-description__content',
+        '.jobs-description-content__text',
+        '.jobs-box__html-content',
+        '[data-test-job-description]',
+        '[class*="jobs-description"]',
+        '[class*="job-description"]',
+      ].join(',')
+    ).each((_, el) => {
+      push($(el).html() || $(el).text(), 'linkedin:fallback-selector');
+    });
+
+    $('script').each((_, el) => {
+      const script = $(el).text();
+      const matches = script.match(/"description"\s*:\s*"((?:\\.|[^"\\]){300,})"/g) || [];
+      for (const match of matches.slice(0, 5)) {
+        const rawValue = match.replace(/^"description"\s*:\s*"/, '').replace(/"$/, '');
+        try {
+          push(JSON.parse(`"${rawValue}"`), 'linkedin:script-description');
+        } catch {
+          push(rawValue, 'linkedin:script-description');
+        }
+      }
+    });
+
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0];
+
+    return best
+      ? { description: best.description, selector: best.selector, chars: best.description.length }
+      : { description: '', selector: 'linkedin:fallback-none', chars: 0 };
   }
 
   private async extractOnce(job: Job): Promise<DetailExtractionResult> {
@@ -519,20 +742,37 @@ class DetailExtractor {
 
       const raw = this.extractFromHtmlBySelectors(html, selectors, job.source);
 
-      const description = cleanDescription(cleanHtml(raw.html));
-      if (description.length < 300) {
-        return { success: false, description, chars: description.length, reason: 'description_under_300_chars', selector: raw.selector };
+      let description = cleanDescription(cleanHtml(raw.html));
+      let selector = raw.selector;
+
+      if (
+        isLinkedInSource(job.source) &&
+        (
+          description.length < LINKEDIN_MIN_REPLACEMENT_CHARS ||
+          !textLooksLikeJobDescription(description, job.title) ||
+          isBadScrapedDescription(description, job.company)
+        )
+      ) {
+        const fallback = this.extractLinkedInFallbackFromHtml(html, job);
+        if (fallback.description.length > description.length) {
+          description = fallback.description;
+          selector = fallback.selector;
+        }
+      }
+
+      if (description.length < LINKEDIN_MIN_REPLACEMENT_CHARS) {
+        return { success: false, description, chars: description.length, reason: 'description_under_300_chars', selector };
       }
 
       if (!textLooksLikeJobDescription(description, job.title)) {
-        return { success: false, description, chars: description.length, reason: 'description_missing_job_signal', selector: raw.selector };
+        return { success: false, description, chars: description.length, reason: 'description_missing_job_signal', selector };
       }
 
       if (isBadScrapedDescription(description, job.company)) {
-        return { success: false, description, chars: description.length, reason: 'bad_scrape_text', selector: raw.selector };
+        return { success: false, description, chars: description.length, reason: 'bad_scrape_text', selector };
       }
 
-      return { success: true, description, chars: description.length, selector: raw.selector };
+      return { success: true, description, chars: description.length, selector };
     } catch (err: any) {
       return { success: false, description: '', chars: 0, reason: err?.message || String(err) };
     } finally {
@@ -549,7 +789,7 @@ class DetailExtractor {
       if (i < attempts - 1) await new Promise(r => setTimeout(r, 700));
     }
 
-    if (DEBUG) {
+    if (TRACE) {
       console.warn(chalk.yellow(
         `     ⚠ enrichment failed: ${job.title} @ ${job.company}: ${last.reason || 'unknown'} (${last.chars} chars)`
       ));
@@ -582,12 +822,39 @@ export class JobProcessor {
   private async enrichJobs(jobs: Job[], stats: JobProcessResult): Promise<Job[]> {
     if (jobs.length === 0) return jobs;
 
-    const extractor = new DetailExtractor(this.config);
+    const source = jobs[0]?.source ?? 'unknown';
+    const policy = getSourcePolicy(source);
     const output: Job[] = [];
-    const concurrency = 3;
     let totalChars = 0;
+    let attemptedEnrichment = 0;
+    let linkedInEnrichmentAttempts = 0;
+    let linkedInEnrichmentFails = 0;
 
     console.log(chalk.dim('  ⤷ Processing job details through shared pipeline...'));
+
+    if (!policy.enrich || policy.maxEnrich <= 0) {
+      for (const job of jobs) {
+        const currentDescription = cleanDescription(job.description || '');
+        totalChars += currentDescription.length;
+        output.push({ ...job, description: currentDescription });
+      }
+
+      stats.avgDescriptionChars = jobs.length ? Math.round(totalChars / jobs.length) : 0;
+      stats.extractionMethods['enrichment:disabled'] = jobs.length;
+
+      if (policy.warnWhenDisabled !== false) {
+        stats.warnings.push('enrichment_disabled_by_source_policy');
+      }
+
+      console.log(chalk.dim(
+        `  ⤷ Shared processing enrichment skipped by source policy: enriched=0/${jobs.length} failed=0 avgChars=${stats.avgDescriptionChars}`
+      ));
+
+      return output;
+    }
+
+    const extractor = new DetailExtractor(this.config);
+    const concurrency = Math.max(1, policy.concurrency);
 
     try {
       for (let i = 0; i < jobs.length; i += concurrency) {
@@ -595,6 +862,17 @@ export class JobProcessor {
         const enriched = await Promise.all(batch.map(async job => {
           const currentDescription = cleanDescription(job.description || '');
           const currentValidation = validateDescription(currentDescription, job.company, job.title);
+          const isLinkedIn = isLinkedInSource(job.source);
+          const preserveLinkedIn = isLinkedIn && hasUsableDescription(job, currentDescription, LINKEDIN_MIN_PRESERVE_CHARS);
+
+          if (preserveLinkedIn) {
+            stats.extractionMethods['linkedin:preserved'] = (stats.extractionMethods['linkedin:preserved'] ?? 0) + 1;
+            totalChars += currentDescription.length;
+            if (TRACE) {
+              console.log(chalk.gray(`     ↳ preserved usable LinkedIn description: ${job.title} @ ${job.company} (${currentDescription.length} chars)`));
+            }
+            return { ...job, description: currentDescription };
+          }
 
           const shouldTryDetail = !currentValidation.ok || currentDescription.length < 700;
           if (!shouldTryDetail) {
@@ -602,18 +880,35 @@ export class JobProcessor {
             return { ...job, description: currentDescription };
           }
 
-          const detail = await extractor.extract(job);
-
-          if (detail.success && detail.description.length > currentDescription.length) {
-            stats.enriched++;
-            totalChars += detail.description.length;
-            if (DEBUG) {
-              console.log(chalk.gray(`     ↳ enriched: ${job.title} @ ${job.company} (${detail.chars} chars via ${detail.selector || 'unknown'})`));
-            }
-            return { ...job, description: detail.description };
+          if (attemptedEnrichment >= policy.maxEnrich) {
+            stats.extractionMethods['enrichment:cap_reached'] = (stats.extractionMethods['enrichment:cap_reached'] ?? 0) + 1;
+            totalChars += currentDescription.length;
+            return { ...job, description: currentDescription };
           }
 
-          if (!detail.success) stats.enrichmentFailed++;
+          attemptedEnrichment++;
+          if (isLinkedIn) linkedInEnrichmentAttempts++;
+          const detail = await extractor.extract(job, policy.attempts);
+
+          const method = extractionMethodKey(detail.selector);
+          if (detail.success && shouldAcceptEnrichedDescription(job, currentDescription, detail.description)) {
+            stats.enriched++;
+            stats.extractionMethods[method] = (stats.extractionMethods[method] ?? 0) + 1;
+            totalChars += cleanDescription(detail.description).length;
+            if (TRACE) {
+              console.log(chalk.gray(`     ↳ enriched: ${job.title} @ ${job.company} (${detail.chars} chars via ${method})`));
+            }
+            return { ...job, description: cleanDescription(detail.description) };
+          }
+
+          if (isLinkedIn && (!detail.success || !shouldAcceptEnrichedDescription(job, currentDescription, detail.description))) {
+            linkedInEnrichmentFails++;
+          }
+
+          if (!detail.success) {
+            stats.enrichmentFailed++;
+            stats.extractionMethods[`failed:${method}`] = (stats.extractionMethods[`failed:${method}`] ?? 0) + 1;
+          }
 
           const fallback = currentDescription || detail.description;
           totalChars += fallback.length;
@@ -627,8 +922,30 @@ export class JobProcessor {
     }
 
     stats.avgDescriptionChars = jobs.length ? Math.round(totalChars / jobs.length) : 0;
+
+    const attempted = stats.enriched + stats.enrichmentFailed;
+    const failRate = attempted > 0 ? stats.enrichmentFailed / attempted : 0;
+    const divCount = stats.extractionMethods.div ?? 0;
+
+    if (attemptedEnrichment >= policy.maxEnrich && policy.maxEnrich < jobs.length) {
+      stats.warnings.push(`enrichment_capped:${policy.maxEnrich}/${jobs.length}`);
+    }
+    if (failRate >= 0.5 && attempted >= 5) stats.warnings.push(`high_enrichment_failure_rate:${Math.round(failRate * 100)}%`);
+    if (linkedInEnrichmentAttempts > 0) {
+      const linkedInFailRate = linkedInEnrichmentFails / linkedInEnrichmentAttempts;
+      if (linkedInFailRate >= 0.5) {
+        stats.warnings.push(`linkedin_enrichment_unstable:${linkedInEnrichmentFails}/${linkedInEnrichmentAttempts}:${Math.round(linkedInFailRate * 100)}%`);
+      }
+    }
+    if (divCount >= Math.max(10, Math.ceil(jobs.length * 0.5))) stats.warnings.push(`div_extraction_dominant:${divCount}/${jobs.length}`);
+    const largeDescriptionThreshold =
+      source === 'SkipTheDrive' ? 9000 : 6500;
+
+    if (stats.avgDescriptionChars > largeDescriptionThreshold) {
+      stats.warnings.push(`large_avg_description:${stats.avgDescriptionChars}`);
+    }
     console.log(chalk.dim(
-      `  ⤷ Shared processing enrichment complete: enriched=${stats.enriched}/${jobs.length} failed=${stats.enrichmentFailed} avgChars=${stats.avgDescriptionChars}`
+      `  ⤷ Shared processing enrichment complete: enriched=${stats.enriched}/${attemptedEnrichment} failed=${stats.enrichmentFailed} avgChars=${stats.avgDescriptionChars}`
     ));
 
     return output;
@@ -646,47 +963,73 @@ export class JobProcessor {
       filtered: 0,
       descriptionUpdated: 0,
       skipReasons: emptySkipReasons(),
+      extractionMethods: {},
+      warnings: [],
+      dbErrors: 0,
+      quality: {
+        badDescriptions: 0,
+        missingCompany: 0,
+        missingLocation: 0,
+        enrichmentFailures: 0,
+        warningRate: 0,
+        rejectionRate: 0,
+        duplicateRate: 0,
+      },
     };
 
     const enrichedJobs = await this.enrichJobs(jobs, stats);
     const dbJobs: Prisma.JobCreateInput[] = [];
 
+    let missingCompanyCount = 0;
+    let missingLocationCount = 0;
+
     for (const job of enrichedJobs) {
+      if (!job.company?.trim()) missingCompanyCount++;
+      if (!job.location?.trim()) missingLocationCount++;
+
       const base = this.validateBase(job);
-      if (!base.ok) {
+      if (base.ok === false) {
         inc(stats, base.reason);
-        if (DEBUG) console.log(chalk.gray(`   ⏭ ${base.reason}: ${job.title || '(missing title)'} @ ${job.company || '(missing company)'}`));
+        if (TRACE) console.log(chalk.gray(`   ⏭ ${base.reason}: ${job.title || '(missing title)'} @ ${job.company || '(missing company)'}`));
         continue;
       }
 
       const desc = validateDescription(job.description || '', job.company, job.title);
-      if (!desc.ok) {
+      if (desc.ok === false) {
         inc(stats, desc.reason);
-        if (DEBUG) console.log(chalk.gray(`   ⏭ ${desc.reason}: ${job.title} @ ${job.company}${desc.detail ? ` (${desc.detail})` : ''}`));
+        if (TRACE) console.log(chalk.gray(`   ⏭ ${desc.reason}: ${job.title} @ ${job.company}${desc.detail ? ` (${desc.detail})` : ''}`));
         continue;
       }
 
       const geo = validateUSRemote(job);
-      if (!geo.ok) {
+      if (geo.ok === false) {
         inc(stats, geo.reason);
         stats.filtered++;
-        if (DEBUG) console.log(chalk.gray(`   ⏭ ${geo.reason}: ${job.title} @ ${job.company}`));
+        if (TRACE) console.log(chalk.gray(`   ⏭ ${geo.reason}: ${job.title} @ ${job.company}`));
         continue;
       }
 
       dbJobs.push(toDbJob(job));
     }
 
+    stats.quality = calculateQuality(stats, missingCompanyCount, missingLocationCount);
+
     if (dbJobs.length === 0) {
       console.log(chalk.yellow(`   ⚠️  ${source}: no jobs passed shared processor`));
       return stats;
     }
 
-    const saved = await this.jobService.saveJobs(dbJobs);
-    stats.added = saved.added;
-    stats.duplicates = saved.duplicates;
-    stats.skipped += saved.skipped;
-    stats.descriptionUpdated = saved.descriptionUpdated ?? 0;
+    try {
+      const saved = await this.jobService.saveJobs(dbJobs);
+      stats.added = saved.added;
+      stats.duplicates = saved.duplicates;
+      stats.skipped += saved.skipped;
+      stats.descriptionUpdated = saved.descriptionUpdated ?? 0;
+    } catch (err: any) {
+      stats.dbErrors++;
+      stats.warnings.push(`db_save_failed:${err?.code || err?.message || 'unknown'}`);
+      console.error(chalk.red(`   ✖ DB save failed for ${source}: ${err?.message || err}`));
+    }
 
     return stats;
   }

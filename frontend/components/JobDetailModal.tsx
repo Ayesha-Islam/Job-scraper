@@ -54,7 +54,6 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
 
         <ScrollArea className="max-h-[calc(90vh-200px)]">
           <div className="p-6 space-y-6">
-            {/* Tags */}
             <div className="flex flex-wrap gap-2">
               {job.location && (
                 <Badge variant="secondary" className="bg-white border border-gray-300 hover:text-white">
@@ -95,7 +94,8 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
             {job.description && (
               <div>
                 <h3 className="font-bold text-lg mb-3 text-gray-700">Job Description</h3>
-                <p className="text-white leading-relaxed whitespace-pre-line">
+                <p className="text-white leading-relaxed  whitespace-pre-wrap
+    break-words">
                   {job.description}
                 </p>
               </div>

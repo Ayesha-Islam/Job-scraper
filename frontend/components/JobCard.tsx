@@ -1,6 +1,6 @@
 import { Bookmark, MapPin, Briefcase, DollarSign, Clock, Building2 } from 'lucide-react';
 import { Job } from '@/types';
-import { formatJobType } from '@/lib/utils';
+import { formatJobType, formatRelativeTime } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,18 +14,7 @@ interface JobCardProps {
 }
 
 export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobCardProps) {
-  const formatDate = (dateString: string | Date) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.ceil(diffDays / 7)} weeks ago`;
-    return `${Math.ceil(diffDays / 30)} months ago`;
-  };
 
   return (
     <Card
@@ -101,7 +90,7 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
               {job.scrapedAt && (
                 <Badge variant="outline" className="bg-white border-black">
                   <Clock className="w-3 h-3 mr-1" />
-                  {formatDate(job.scrapedAt)}
+                  {formatRelativeTime(job.scrapedAt)}
                 </Badge>
               )}
             </div>
