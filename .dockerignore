@@ -1,0 +1,73 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.next
+tsconfig.tsbuildinfo
+.git
+.env
+.env.*
+*.log
+# Build outputs
+.next
+dist
+build
+coverage
+
+# Cache
+.cache
+.parcel-cache
+.eslintcache
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Testing
+coverage
+.nyc_output
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+
+# Misc
+tmp
+temp
+*.tmp
+
+# Documentation
+README.md
+docs
+
+# Local screenshots / exports
+screenshots
+exports
