@@ -9,7 +9,7 @@ export default function ProtectedRoutes({
 }: {
     children: React.ReactNode
 }) {
-    const { data: session, status } = useSession();
+    const { status } = useSession();
     const route = useRouter();
 
     useEffect(() => {

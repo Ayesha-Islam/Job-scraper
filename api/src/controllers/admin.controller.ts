@@ -5,11 +5,11 @@ import { ApiResponse } from '../types';
 import { ScraperManager } from 'src/scrape';
 
 export class AdminController {
-  constructor(private container: Container) {}
+  constructor(private container: Container) { }
 
   async triggerScrape(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { source } = req.body;
+      const { source } = req.body?.source ? { source: req.body.source } : {};
 
       console.log(chalk.blue('🚀 Manual scrape triggered...'));
 
@@ -148,13 +148,13 @@ export class AdminController {
     try {
       console.log(chalk.cyan('📊 Fetching cache statistics...'));
 
-      const redisInfo = await this.container.redis.info('stats');
+      const redisInfo = await this.container.cache.info('stats');
       const hits = parseInt(redisInfo.match(/keyspace_hits:(\d+)/)?.[1] || '0');
       const misses = parseInt(redisInfo.match(/keyspace_misses:(\d+)/)?.[1] || '0');
       const total = hits + misses;
       const hitRate = total > 0 ? ((hits / total) * 100).toFixed(2) : '0';
 
-      const keys = await this.container.redis.keys('*');
+      const keys = await this.container.cache.keys('*');
 
       res.json({
         success: true,

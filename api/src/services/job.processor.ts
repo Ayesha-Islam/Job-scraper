@@ -200,18 +200,18 @@ const DEFAULT_SOURCE_POLICY: SourcePolicy = {
 
 const SOURCE_POLICIES: Record<string, SourcePolicy> = {
   // RSS/API sources already provide usable descriptions; enrichment would only waste CPU.
-  'We Work Remotely': { enrich: false, concurrency: 1, maxEnrich: 20, attempts: 1, warnWhenDisabled: false },
-  Remotive: { enrich: false, concurrency: 1, maxEnrich: 30, attempts: 1, warnWhenDisabled: false },
+  'We Work Remotely': { enrich: false, concurrency: 1, maxEnrich: 50, attempts: 1, warnWhenDisabled: false },
+  Remotive: { enrich: false, concurrency: 1, maxEnrich: 50, attempts: 1, warnWhenDisabled: false },
 
   // Reliable JSON-LD/detail pages.
-  RemoteOK: { enrich: true, concurrency: 1, maxEnrich: 20, attempts: 1 },
-  'Y Combinator': { enrich: true, concurrency: 2, maxEnrich: 20, attempts: 1 },
-  LinkedIn: { enrich: true, concurrency: 1, maxEnrich: 30, attempts: 1 },
-  SkipTheDrive: { enrich: true, concurrency: 1, maxEnrich: 20, attempts: 1 },
+  RemoteOK: { enrich: true, concurrency: 1, maxEnrich: 50, attempts: 1 },
+  'Y Combinator': { enrich: true, concurrency: 2, maxEnrich: 50, attempts: 1 },
+  LinkedIn: { enrich: true, concurrency: 1, maxEnrich: 50, attempts: 1 },
+  SkipTheDrive: { enrich: true, concurrency: 1, maxEnrich: 50, attempts: 1 },
 
   // Keep resource usage low on laptop.
-  'Hubstaff Talent': { enrich: true, concurrency: 1, maxEnrich: 30, attempts: 1 },
-  RemoteHub: { enrich: true, concurrency: 1, maxEnrich: 30, attempts: 1 },
+  'Hubstaff Talent': { enrich: true, concurrency: 1, maxEnrich: 50, attempts: 1 },
+  RemoteHub: { enrich: true, concurrency: 1, maxEnrich: 50, attempts: 1 },
 
   // NoDesk is intentionally experimental. The listing page has no real descriptions,
   // and detail pages repeatedly return template/bad-scrape text. Keep it out of
@@ -275,8 +275,22 @@ function removeEmoji(text: string): string {
     .replace(/[\u{2600}-\u{27BF}]/gu, ' ')
     .replace(/[\u{2300}-\u{23FF}]/gu, ' ')
     .replace(/[\u{1F004}-\u{1F0CF}]/gu, ' ')
+    // Private-use-area glyphs used by icon fonts (Material Icons, FontAwesome, etc.)
+    // often leak into innerText scrapes as a single "tofu" character.
+    .replace(/[\u{E000}-\u{F8FF}]/gu, ' ')
     .replace(/  +/g, ' ')
     .trim();
+}
+
+// Standalone lines that are almost always leftover social-share / nav widgets
+// rather than real job content (e.g. a lone "X" from a "Share on X" icon button,
+// or "f" / "in" from Facebook / LinkedIn share icons).
+const NOISE_STANDALONE_LINE_RE = /^(x|f|in|share|tweet|post|email this|print|copy link|share this job|follow us|share on (x|facebook|linkedin|twitter))$/i;
+
+// Invisible/irregular unicode whitespace that visually creates "blank" lines
+// but isn't matched by a plain [ \t] collapse (nbsp, zero-width space, etc.).
+function normalizeWhitespace(text: string): string {
+  return text.replace(/[\u00A0\u200B\u200C\u200D\u2028\u2029\uFEFF]/g, ' ');
 }
 
 function cleanHtml(raw: string): string {
@@ -301,7 +315,7 @@ function cleanHtml(raw: string): string {
     .trim();
 }
 
-function cleanDescription(text: string): string {
+export function cleanDescription(text: string): string {
   if (!text) return '';
 
   const noiseLinePatterns: RegExp[] = [
@@ -338,18 +352,69 @@ function cleanDescription(text: string): string {
     /^terms of service$/i,
   ];
 
-  const lines = text.split('\n');
-  const cutIndex = lines.findIndex(line => {
+  const normalizedText = normalizeWhitespace(text);
+  const rawLines = normalizedText.split('\n');
+
+  // Footer/nav sections (e.g. "People also viewed", "Apply now") signal the
+  // real job content has ended — cut everything from that point on.
+  const cutIndex = rawLines.findIndex(line => {
     const trimmed = line.trim();
     return trimmed.length > 0 && noiseLinePatterns.some(re => re.test(trimmed));
   });
+  const withinContent = cutIndex !== -1 ? rawLines.slice(0, cutIndex) : rawLines;
 
-  const kept = cutIndex !== -1 ? lines.slice(0, cutIndex) : lines;
+  // Drop stray single-line widgets that can appear anywhere in the body
+  // (e.g. a lone "X" left behind by a "Share on X" icon button), and trim
+  // each line so whitespace-only lines collapse to true empty lines.
+  const trimmedLines = withinContent
+    .map(line => removeEmoji(line).trim())
+    .filter(line => !NOISE_STANDALONE_LINE_RE.test(line));
 
-  return removeEmoji(kept.join('\n'))
+  // Collapse any run of consecutive blank lines into a single blank line,
+  // and drop leading/trailing blank lines.
+  const collapsedLines: string[] = [];
+  let lastWasBlank = true; // treat the start of the text as if preceded by a blank line
+  for (const line of trimmedLines) {
+    const isBlank = line.length === 0;
+    if (isBlank && lastWasBlank) continue;
+    collapsedLines.push(line);
+    lastWasBlank = isBlank;
+  }
+  while (collapsedLines.length > 0 && collapsedLines[collapsedLines.length - 1] === '') {
+    collapsedLines.pop();
+  }
+
+  return collapsedLines
+    .join('\n')
     .replace(/[ \t]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+/**
+ * Splits an already-cleaned description into paragraphs (blocks separated by
+ * a blank line). Each paragraph keeps its internal single line breaks (e.g.
+ * bullet lists), but paragraph breaks are normalized to exactly one gap.
+ *
+ * Use this wherever a description needs to be handed to a renderer as
+ * distinct paragraphs (e.g. an API response that the frontend will map
+ * straight into <p> tags) instead of one raw blob of text.
+ */
+export function getDescriptionParagraphs(text: string): string[] {
+  const cleaned = cleanDescription(text);
+  if (!cleaned) return [];
+
+  return cleaned
+    .split(/\n{2,}/)
+    .map(p => p.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Single-line preview for compact contexts (e.g. a job card snippet), with
+ * all the same noise removed and line breaks flattened into spaces.
+ */
+export function getDescriptionPreview(text: string): string {
+  return cleanDescription(text).replace(/\n+/g, ' ').replace(/ +/g, ' ').trim();
 }
 
 function textLooksLikeJobDescription(text: string, title: string): boolean {
@@ -625,6 +690,9 @@ class DetailExtractor {
       }
 
       if (source === 'RemoteOK' && /join remote ok|remote jobs for digital nomads/i.test(t)) {
+        score -= 3000;
+      }
+      if (source === 'LinkedIn' && /join remote ok|remote jobs for digital nomads|find the best remote jobs/i.test(t)) {
         score -= 3000;
       }
 

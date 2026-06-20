@@ -8,7 +8,7 @@ import { SavedJobs } from '@/components/SavedJobs';
 export default function App() {
     const [currentScreen, setCurrentScreen] = useState<'landing' | 'signin' | 'browse' | 'saved'>('landing');
     const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isLoggedIn] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
 
     const handleSaveJob = (jobId: string) => {
@@ -35,7 +35,7 @@ export default function App() {
                     onBrowseJobs={() => setCurrentScreen('browse')}
                 />
             )}
-            
+
             {currentScreen === 'browse' && (
                 <BrowseJobs
                     jobs={[]}

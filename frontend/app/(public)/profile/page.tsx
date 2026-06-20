@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import {
   Lock, Bell, Shield, Briefcase, Trash2,
   ChevronRight, ChevronDown, Eye, EyeOff, Check, AlertTriangle,
@@ -13,13 +12,11 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
   return (
     <button
       onClick={() => onChange(!enabled)}
-      className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${
-        enabled ? "bg-[#15202B] border border-white/30" : "bg-white/10 border border-white/10"
-      }`}
+      className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${enabled ? "bg-[#15202B] border border-white/30" : "bg-white/10 border border-white/10"
+        }`}
     >
-      <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full transition-transform duration-200 ${
-        enabled ? "translate-x-5 bg-white" : "translate-x-0 bg-gray-500"
-      }`} />
+      <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full transition-transform duration-200 ${enabled ? "translate-x-5 bg-white" : "translate-x-0 bg-gray-500"
+        }`} />
     </button>
   );
 }
@@ -60,33 +57,31 @@ function SettingRow({
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const router = useRouter();
-
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
-  const [showPw,    setShowPw]    = useState({ current: false, next: false, confirm: false });
-  const [pwSaved,   setPwSaved]   = useState(false);
+  const [showPw, setShowPw] = useState({ current: false, next: false, confirm: false });
+  const [pwSaved, setPwSaved] = useState(false);
 
   const [notifs, setNotifs] = useState({
-    emailJobAlerts:   true,
-    emailApplications:true,
-    pushNewJobs:      false,
-    pushMessages:     true,
-    smsAlerts:        false,
-    weeklyDigest:     true,
+    emailJobAlerts: true,
+    emailApplications: true,
+    pushNewJobs: false,
+    pushMessages: true,
+    smsAlerts: false,
+    weeklyDigest: true,
   });
 
   const [privacy, setPrivacy] = useState({
-    profileVisible:   true,
-    resumeVisible:    false,
-    activityVisible:  true,
-    searchable:       true,
+    profileVisible: true,
+    resumeVisible: false,
+    activityVisible: true,
+    searchable: true,
   });
 
   const [prefs, setPrefs] = useState({
-    openToWork:    true,
-    remoteOnly:    false,
-    fullTimeOnly:  false,
-    emailDigest:   true,
+    openToWork: true,
+    remoteOnly: false,
+    fullTimeOnly: false,
+    emailDigest: true,
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -98,9 +93,9 @@ export default function SettingsPage() {
     setPasswords({ current: "", next: "", confirm: "" });
   };
 
-  const toggleNotif  = (k: keyof typeof notifs)  => setNotifs(p  => ({ ...p,  [k]: !p[k] }));
-  const togglePrivacy = (k: keyof typeof privacy) => setPrivacy(p => ({ ...p,  [k]: !p[k] }));
-  const togglePref    = (k: keyof typeof prefs)   => setPrefs(p   => ({ ...p,  [k]: !p[k] }));
+  const toggleNotif = (k: keyof typeof notifs) => setNotifs(p => ({ ...p, [k]: !p[k] }));
+  const togglePrivacy = (k: keyof typeof privacy) => setPrivacy(p => ({ ...p, [k]: !p[k] }));
+  const togglePref = (k: keyof typeof prefs) => setPrefs(p => ({ ...p, [k]: !p[k] }));
 
   const pwInput = (key: keyof typeof passwords) => (
     <div className="relative">
@@ -179,7 +174,7 @@ export default function SettingsPage() {
           <SettingRow
             label="Job Alerts"
             description="New jobs matching your preferences"
-            action={<Toggle enabled={notifs.emailJobAlerts}   onChange={() => toggleNotif("emailJobAlerts")} />}
+            action={<Toggle enabled={notifs.emailJobAlerts} onChange={() => toggleNotif("emailJobAlerts")} />}
           />
           <SettingRow
             label="Application Updates"
@@ -189,7 +184,7 @@ export default function SettingsPage() {
           <SettingRow
             label="Weekly Digest"
             description="Summary of top jobs every week"
-            action={<Toggle enabled={notifs.weeklyDigest}     onChange={() => toggleNotif("weeklyDigest")} />}
+            action={<Toggle enabled={notifs.weeklyDigest} onChange={() => toggleNotif("weeklyDigest")} />}
           />
 
           <div className="px-4 pt-3 pb-1">
@@ -198,7 +193,7 @@ export default function SettingsPage() {
           <SettingRow
             label="New Jobs"
             description="Instant alerts for new postings"
-            action={<Toggle enabled={notifs.pushNewJobs}  onChange={() => toggleNotif("pushNewJobs")} />}
+            action={<Toggle enabled={notifs.pushNewJobs} onChange={() => toggleNotif("pushNewJobs")} />}
           />
           <SettingRow
             label="Messages"
@@ -220,12 +215,12 @@ export default function SettingsPage() {
           <SettingRow
             label="Public Profile"
             description="Recruiters can find and view your profile"
-            action={<Toggle enabled={privacy.profileVisible}  onChange={() => togglePrivacy("profileVisible")} />}
+            action={<Toggle enabled={privacy.profileVisible} onChange={() => togglePrivacy("profileVisible")} />}
           />
           <SettingRow
             label="Resume Visibility"
             description="Allow recruiters to download your resume"
-            action={<Toggle enabled={privacy.resumeVisible}   onChange={() => togglePrivacy("resumeVisible")} />}
+            action={<Toggle enabled={privacy.resumeVisible} onChange={() => togglePrivacy("resumeVisible")} />}
           />
           <SettingRow
             label="Activity Status"
@@ -235,7 +230,7 @@ export default function SettingsPage() {
           <SettingRow
             label="Appear in Search"
             description="Show your profile in recruiter searches"
-            action={<Toggle enabled={privacy.searchable}      onChange={() => togglePrivacy("searchable")} />}
+            action={<Toggle enabled={privacy.searchable} onChange={() => togglePrivacy("searchable")} />}
           />
         </Section>
 
@@ -243,12 +238,12 @@ export default function SettingsPage() {
           <SettingRow
             label="#OpenToWork"
             description="Signal to recruiters you're looking"
-            action={<Toggle enabled={prefs.openToWork}   onChange={() => togglePref("openToWork")} />}
+            action={<Toggle enabled={prefs.openToWork} onChange={() => togglePref("openToWork")} />}
           />
           <SettingRow
             label="Remote Only"
             description="Only show remote job listings"
-            action={<Toggle enabled={prefs.remoteOnly}   onChange={() => togglePref("remoteOnly")} />}
+            action={<Toggle enabled={prefs.remoteOnly} onChange={() => togglePref("remoteOnly")} />}
           />
           <SettingRow
             label="Full-time Only"
@@ -258,7 +253,7 @@ export default function SettingsPage() {
           <SettingRow
             label="Email Job Digest"
             description="Curated daily job recommendations"
-            action={<Toggle enabled={prefs.emailDigest}  onChange={() => togglePref("emailDigest")} />}
+            action={<Toggle enabled={prefs.emailDigest} onChange={() => togglePref("emailDigest")} />}
           />
         </Section>
 

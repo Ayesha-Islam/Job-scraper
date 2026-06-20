@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BrowseJobs } from '@/components/BrowseJobs';
 import { getJobs } from '@/lib/api';
 import { Job } from '@/types';
-import { FilterOptions } from '@/components/FilterPanel';
 
-export default function JobsPage() {
+function JobsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
@@ -34,13 +33,7 @@ export default function JobsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const filters = (e as CustomEvent<FilterOptions>).detail;
-    };
-    window.addEventListener("filtersChanged", handler);
-    return () => window.removeEventListener("filtersChanged", handler);
-  }, []);
+
   useEffect(() => {
     async function fetchJobs() {
       try {
@@ -49,7 +42,7 @@ export default function JobsPage() {
 
         const response = await getJobs({
           page: 1,
-          limit: 100, 
+          limit: 100,
           search: initialSearch || undefined,
         });
 
@@ -126,5 +119,23 @@ export default function JobsPage() {
       showFilters={showFilters}
       onToggleFilters={handleToggleFilters}
     />
+  );
+
+}
+
+export default function JobsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0B1421] flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-gray-300">Loading jobs...</p>
+          </div>
+        </div>
+      }
+    >
+      <JobsPageContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Job } from "@/types";
 import { getJobById } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,6 @@ import Link from "next/link";
 
 export default function JobDetailsPage() {
   const params = useParams();
-  const router = useRouter();
   const jobId = params.id as string;
 
   const [job, setJob] = useState<Job | null>(null);
@@ -101,7 +100,7 @@ export default function JobDetailsPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-                {job.title}
+                {job.position}
               </h1>
 
               <div className="flex items-center gap-2 mb-2">

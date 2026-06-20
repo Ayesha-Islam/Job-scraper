@@ -991,8 +991,16 @@ export class RemoteHubScraper extends JobBoardScraper {
       for (let p = 1; p <= pages; p++) {
         const url = `https://www.remotehub.com/jobs/search?search=${encodeURIComponent(query)}&location_type=remote&country=United+States&page=${p}`;
         console.log(chalk.dim(`  [RemoteHub] page ${p} → ${url}`));
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: this.config.timeout });
+        await page.goto(url, {
+          waitUntil: 'domcontentloaded',
+          timeout: 25000,
+        });
+
+        await page
+          .waitForSelector('mat-card.mat-card', { timeout: 12000 })
+          .catch(() => { });
         await this.sleep(this.config.delay * 2);
+
         const $ = cheerio.load(await page.content());
         $('mat-card.mat-card').each((_, el) => {
           const $el = $(el);

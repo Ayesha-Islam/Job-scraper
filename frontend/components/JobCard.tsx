@@ -19,9 +19,8 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
   return (
     <Card
       onClick={onClick}
-      className={`relative bg-[#15202B] border-none hover:shadow-2xl hover:scale-[1.02] hover:border-gray-800 transition-all duration-300 cursor-pointer group flex flex-col ${
-        compact ? 'h-full' : ''
-      }`}
+      className={`relative bg-[#15202B] border-none hover:shadow-2xl hover:scale-[1.02] hover:border-gray-800 transition-all duration-300 cursor-pointer group flex flex-col ${compact ? 'h-full' : ''
+        }`}
     >
       <Button
         onClick={(e) => {
@@ -33,9 +32,8 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
         className="absolute top-4 right-4 z-10 hover:bg-white/10 rounded-full"
       >
         <Bookmark
-          className={`w-5 h-5 transition-all ${
-            isSaved ? 'fill-white stroke-white' : 'stroke-white hover:fill-white/50'
-          }`}
+          className={`w-5 h-5 transition-all ${isSaved ? 'fill-white stroke-white' : 'stroke-white hover:fill-white/50'
+            }`}
         />
       </Button>
 

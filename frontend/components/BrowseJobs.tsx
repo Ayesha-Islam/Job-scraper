@@ -29,7 +29,6 @@ export function BrowseJobs({
   jobs: initialJobs,
   onSaveJob,
   savedJobs,
-  onNavigateToSaved,
   initialSearch = '',
   showFilters,
   onToggleFilters

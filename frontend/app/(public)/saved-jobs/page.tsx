@@ -9,7 +9,7 @@ import { Job } from '@/types';
 
 export default function SavedPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +29,7 @@ export default function SavedPage() {
           const parsedSaved = JSON.parse(saved) as string[];
           const savedIds = new Set<string>(parsedSaved);
           setSavedJobs(savedIds);
-          
+
           if (savedIds.size > 0) {
             fetchSavedJobs(savedIds);
           } else {
@@ -48,14 +48,14 @@ export default function SavedPage() {
   const fetchSavedJobs = async (savedIds: Set<string>) => {
     try {
       setLoading(true);
-      
+
       const response = await getJobs({
         page: 1,
         limit: 1000,
       });
 
       if (response.success && response.data) {
-        const savedJobsData = response.data.data.filter((job: Job) => 
+        const savedJobsData = response.data.data.filter((job: Job) =>
           savedIds.has(job.id)
         );
         setJobs(savedJobsData);
@@ -71,13 +71,13 @@ export default function SavedPage() {
     setSavedJobs(prev => {
       const newSet = new Set<string>(prev);
       newSet.delete(jobId);
-      
+
       if (typeof window !== 'undefined') {
         localStorage.setItem('savedJobs', JSON.stringify(Array.from(newSet)));
       }
-      
+
       setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
-      
+
       return newSet;
     });
   };
@@ -98,7 +98,7 @@ export default function SavedPage() {
   }
 
   return (
-    <SavedJobs 
+    <SavedJobs
       jobs={jobs}
       savedJobs={savedJobs}
       onNavigateToBrowse={() => router.push('/jobs')}

@@ -25,22 +25,22 @@ export class Container {
   private _adminController: AdminController;
 
   public readonly env: Env;
-  public readonly redis: IORedis;
+  // public readonly redis: IORedis;
 
   private constructor() {
     console.log(chalk.cyan('🔧 Initializing Container...'));
     this.env = env;
 
-    this.redis = new IORedis({
-      host: env.REDIS_HOST,
-      port: parseInt(env.REDIS_PORT, 10),
-      ...(env.REDIS_PASSWORD ? { password: env.REDIS_PASSWORD } : {}),
-      retryStrategy: (times: number) => Math.min(times * 50, 2000),
-      maxRetriesPerRequest: 3,
-    });
+    // this.redis = new IORedis({
+    //   host: env.REDIS_HOST,
+    //   port: parseInt(env.REDIS_PORT, 10),
+    //   ...(env.REDIS_PASSWORD ? { password: env.REDIS_PASSWORD } : {}),
+    //   retryStrategy: (times: number) => Math.min(times * 50, 2000),
+    //   maxRetriesPerRequest: 3,
+    // });
 
-    this.redis.on('connect', () => console.log('✅ Redis connected'));
-    this.redis.on('error',   (err: any) => console.error('❌ Redis error:', err));
+    // this.redis.on('connect', () => console.log('✅ Redis connected'));
+    // this.redis.on('error',   (err: any) => console.error('❌ Redis error:', err));
 
     this._db   = db;
     this._pool = pool;
@@ -50,9 +50,7 @@ export class Container {
     this._jobController   = new JobController(this._jobService);
     this._statsController = new StatsController(this._jobService);
     this._healthController = new HealthController(this);
-
     this._authController  = new AuthController(this._db);
-
     this._adminController = new AdminController(this);
 
     console.log(chalk.green('✓ Container initialized'));
