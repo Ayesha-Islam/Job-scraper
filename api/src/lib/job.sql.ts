@@ -45,8 +45,8 @@ export async function queryJobs(
   const whereClause = conditions.join(' AND ');
 
   const orderByMap: Record<string, string> = {
-    recent: '"createdAt" DESC',
-    oldest: '"createdAt" ASC',
+    recent: '"postedAt" DESC NULLS LAST, "createdAt" DESC',
+    oldest: '"postedAt" ASC NULLS LAST, "createdAt" ASC',
     salary: 'salary DESC NULLS LAST',
   };
   const orderBy = orderByMap[filters.sortBy ?? 'recent'] ?? orderByMap.recent;
