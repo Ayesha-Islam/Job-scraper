@@ -13,6 +13,46 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+
+type DescriptionBlock =
+  | { type: 'heading'; text: string }
+  | { type: 'paragraph'; text: string };
+
+function stripStaleHtml(raw: string | null | undefined): string {
+  if (!raw) return '';
+
+  return raw
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(p|div|section|article|ul|ol|li|h[1-6])[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function getDescriptionBlocks(raw: string | null | undefined): DescriptionBlock[] {
+  return stripStaleHtml(raw)
+    .split(/\n{2,}/)
+    .map(block => block.trim())
+    .filter(Boolean)
+    .map(block => {
+      if (block.startsWith('## ')) {
+        return { type: 'heading', text: block.replace(/^##\s+/, '').trim() };
+      }
+
+      return { type: 'paragraph', text: block };
+    });
+}
+
 interface JobDetailModalProps {
   job: Job;
   isSaved: boolean;
@@ -21,6 +61,9 @@ interface JobDetailModalProps {
 }
 
 export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModalProps) {
+  const descriptionBlocks = getDescriptionBlocks(job.description);
+  const relativeTimeSource = job.postedAt || job.scrapedAt;
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] bg-[#0B1421] border border-gray-700">
@@ -81,27 +124,36 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
                 </Badge>
               )}
 
-              {job.scrapedAt && (
+              {relativeTimeSource && (
                 <Badge variant="outline" className="text-[#FFFFFF] border-gray-300 hover:text-white">
                   <Clock className="w-4 h-4 mr-1.5" />
-                  {formatRelativeTime(job.scrapedAt)}
+                  {formatRelativeTime(relativeTimeSource)}
                 </Badge>
               )}
             </div>
 
             <Separator />
 
-            {job.description && (
+            {descriptionBlocks.length > 0 && (
               <div>
                 <h3 className="font-bold text-lg mb-3 text-gray-700">Job Description</h3>
-                <p className="text-white leading-relaxed  whitespace-pre-wrap
-    break-words">
-                  {job.description}
-                </p>
+                <div className="space-y-4">
+                  {descriptionBlocks.map((block, index) => (
+                    block.type === 'heading' ? (
+                      <h4 key={index} className="text-white font-semibold text-base mt-5 first:mt-0">
+                        {block.text}
+                      </h4>
+                    ) : (
+                      <p key={index} className="text-white leading-relaxed whitespace-pre-wrap break-words">
+                        {block.text}
+                      </p>
+                    )
+                  ))}
+                </div>
               </div>
             )}
 
-            {!job.description && (
+            {descriptionBlocks.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-gray-300">No detailed description available</p>
               </div>

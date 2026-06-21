@@ -47,7 +47,7 @@ export async function queryJobs(
   const orderByMap: Record<string, string> = {
     recent: '"postedAt" DESC NULLS LAST, "createdAt" DESC',
     oldest: '"postedAt" ASC NULLS LAST, "createdAt" ASC',
-    salary: 'salary DESC NULLS LAST',
+    salary: 'salary DESC NULLS LAST, "postedAt" DESC NULLS LAST, "createdAt" DESC',
   };
   const orderBy = orderByMap[filters.sortBy ?? 'recent'] ?? orderByMap.recent;
 

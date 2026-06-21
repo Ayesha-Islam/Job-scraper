@@ -5,6 +5,32 @@ import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
+
+function stripStaleHtml(raw: string | null | undefined): string {
+  if (!raw) return '';
+
+  return raw
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(p|div|section|article|ul|ol|li|h[1-6])[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function getDescriptionPreview(raw: string | null | undefined): string {
+  return stripStaleHtml(raw).replace(/^##\s+/gm, '').replace(/\n+/g, ' ').replace(/ +/g, ' ').trim();
+}
+
 interface JobCardProps {
   job: Job;
   isSaved: boolean;
@@ -14,7 +40,8 @@ interface JobCardProps {
 }
 
 export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobCardProps) {
-
+  const descriptionPreview = getDescriptionPreview(job.description);
+  const relativeTimeSource = job.postedAt || job.scrapedAt;
 
   return (
     <Card
@@ -85,17 +112,17 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
                 </Badge>
               )}
 
-              {job.scrapedAt && (
+              {relativeTimeSource && (
                 <Badge variant="outline" className="bg-white border-black">
                   <Clock className="w-3 h-3 mr-1" />
-                  {formatRelativeTime(job.scrapedAt)}
+                  {formatRelativeTime(relativeTimeSource)}
                 </Badge>
               )}
             </div>
 
-            {job.description && (
+            {descriptionPreview && (
               <p className="text-sm text-white line-clamp-2 leading-relaxed">
-                {job.description}
+                {descriptionPreview}
               </p>
             )}
 

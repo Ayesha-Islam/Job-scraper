@@ -144,6 +144,8 @@ const SOURCE_SELECTORS: Record<string, string[]> = {
   'Hubstaff Talent': ['.job-description', '.description', '[class*="description"]', 'main', 'article'],
   SkipTheDrive: ['.entry-content', '.post-content', 'article', 'main'],
   RemoteHub: [
+    'mat-card .description',
+    '.mat-card .description',
     '[class*="job-description"]',
     '[class*="job-content"]',
     '[class*="description"]',
@@ -172,7 +174,8 @@ const SOURCE_SELECTORS: Record<string, string[]> = {
 const NO_GENERIC_DIV_FALLBACK_SOURCES = new Set([
   'NoDesk',
   'Hubstaff Talent',
-  'SkipTheDrive'
+  'SkipTheDrive',
+  'RemoteHub',
 ]);
 
 function shouldUseGenericFallback(source: string): boolean {
@@ -298,20 +301,38 @@ function cleanHtml(raw: string): string {
   return raw
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+
+    // Preserve common HTML headings as markdown-style heading markers.
+    .replace(/<h[1-6][^>]*>/gi, '\n## ')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(
+      /<(p|div)[^>]*>\s*<(strong|b)[^>]*>\s*([\s\S]{2,120}?)\s*<\/\2>\s*<\/\1>/gi,
+      (_match, _block, _bold, text) => `\n## ${text}\n\n`
+    )
+    .replace(
+      /<(strong|b)[^>]*>\s*([^<]{2,120}?)\s*(?:<br\s*\/?>\s*){1,}<\/\1>/gi,
+      (_match, _tag, text) => `\n## ${text}\n\n`
+    )
+
+    .replace(/<(p|div|li|h[1-6])[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/\1>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<\/h[1-6]>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<(p|div|section|article|ul|ol|li)[^>]*>/gi, '\n')
+    .replace(/<\/(p|div|section|article|ul|ol|li)>/gi, '\n')
+    .replace(/<\/?(a|span|button|mat-icon|mat-chip|small|label|em|i)[^>]*>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
+    .replace(/[\u00A0\u200B\u200C\u200D\u2028\u2029\uFEFF]/g, ' ')
     .replace(/\r\n/g, '\n')
     .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
+    .replace(/^(## .+)\n(?!\n)/gm, '$1\n\n')
     .trim();
 }
 
@@ -361,7 +382,18 @@ export function cleanDescription(text: string): string {
     const trimmed = line.trim();
     return trimmed.length > 0 && noiseLinePatterns.some(re => re.test(trimmed));
   });
-  const withinContent = cutIndex !== -1 ? rawLines.slice(0, cutIndex) : rawLines;
+  const trailingTrimmed = cutIndex !== -1 ? rawLines.slice(0, cutIndex) : rawLines;
+
+  // If extraction accidentally starts with navigation/breadcrumb text, keep the
+  // first line that looks like real job prose and drop page chrome before it.
+  const startIndex = trailingTrimmed.findIndex((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (index === 0 && !/^(home|general|jobs|close|menu|breadcrumb)$/i.test(trimmed)) return true;
+    return /^(about the role|about this role|the role|responsibilities|requirements|qualifications|what you('|’)ll do|what you will do|job description|description)$/i.test(trimmed)
+      || /\b(we are looking|we're looking|you will|responsibilities include|requirements include)\b/i.test(trimmed);
+  });
+  const withinContent = startIndex > 0 ? trailingTrimmed.slice(startIndex) : trailingTrimmed;
 
   // Drop stray single-line widgets that can appear anywhere in the body
   // (e.g. a lone "X" left behind by a "Share on X" icon button), and trim
@@ -424,20 +456,81 @@ function textLooksLikeJobDescription(text: string, title: string): boolean {
   const hasDescriptionSignal = DESCRIPTION_JOB_KEYWORDS_RE.test(cleaned);
   const hasTitleSignal = TITLE_JOB_KEYWORDS_RE.test(title);
 
-  return hasDescriptionSignal || hasTitleSignal;
+  if (isLinkedInAuthWall(text)) return false;
+
+  return hasDescriptionSignal && (hasTitleSignal || cleaned.length >= 300);
+}
+
+function isLinkedInAuthWall(description: string): boolean {
+  const text = description.toLowerCase().replace(/\s+/g, ' ').trim();
+
+  const authWallSignals = [
+    'join or sign in to find your next job',
+    'email or phone',
+    'forgot password',
+    'sign in with email',
+    'new to linkedin',
+    'join now',
+    'by clicking continue to join or sign in',
+    'linkedin user agreement',
+    'linkedin privacy policy',
+    'linkedin cookie policy',
+  ];
+
+  return authWallSignals.some(signal => text.includes(signal));
+}
+
+function isJammedNavigationShell(text: string): boolean {
+  const compact = text.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return (
+    compact.includes('closehomehomegeneral') ||
+    compact.includes('homegeneraljobs') ||
+    (compact.includes('generaljobs') && compact.includes('similarjobs'))
+  );
+}
+
+function isRemoteHubPageWrapper(description: string): boolean {
+  const text = description.toLowerCase().replace(/\s+/g, ' ').trim();
+
+  if (isJammedNavigationShell(description)) return true;
+
+  const hasPageChrome =
+    /\b(home|general|jobs|companies|post a job|sign in|log in|menu|close)\b/i.test(text);
+  const hasSimilarJobs = /\bsimilar jobs\b|\brelated jobs\b|\brecommended jobs\b/i.test(text);
+  const hasFooterOrSidebar =
+    /\bremotehub\b|\bcompany profile\b|\bshare this job\b|\bapply now\b|\bposted\b|\bviews\b/i.test(text);
+
+  return hasSimilarJobs && hasPageChrome && hasFooterOrSidebar;
 }
 
 function isBadScrapedDescription(description: string, company: string): boolean {
   const text = description.toLowerCase().replace(/\s+/g, ' ').trim();
   const companyKey = company.toLowerCase().trim();
-
   if (!text) return true;
+  if (isLinkedInAuthWall(description)) return true;
+  if (isRemoteHubPageWrapper(description)) return true;
+
   if (text.includes('sort by latest jobs highest paid')) return true;
   if (text.includes('apply for this job please let')) return true;
   if (text.includes('please let') && text.includes('found this position on')) return true;
   if (text.includes('about fluidstack') && companyKey !== 'fluidstack') return true;
   if (text.includes('remote jobs for digital working nomads') && !text.includes(companyKey)) return true;
   if (text.includes('find the best remote jobs') && !text.includes(companyKey)) return true;
+  if (
+    text.includes('similar jobs') &&
+    text.includes('home') &&
+    text.includes('general') &&
+    text.includes('close')
+  ) {
+    return true;
+  }
+
+  if (
+    text.includes('remotehub') &&
+    text.includes('similar jobs')
+  ) {
+    return true;
+  }
 
   // Cloudflare / anti-bot / infrastructure pages should never be stored as job descriptions.
   if (/error\s+10\d{2}/i.test(description)) return true;
@@ -477,6 +570,10 @@ function hasUsableDescription(job: Job, description: string, minChars = 80): boo
 function shouldAcceptEnrichedDescription(job: Job, currentDescription: string, enrichedDescription: string): boolean {
   const current = cleanDescription(currentDescription);
   const enriched = cleanDescription(enrichedDescription);
+
+  if (isLinkedInSource(job.source) && isLinkedInAuthWall(enriched)) {
+    return false;
+  }
 
   if (!hasUsableDescription(job, enriched, LINKEDIN_MIN_REPLACEMENT_CHARS)) {
     return false;
@@ -675,14 +772,17 @@ class DetailExtractor {
 
     const scoreText = (text: string): number => {
       const t = text.toLowerCase();
-      let score = text.length;
-
+      let score = Math.sqrt(text.length) * 50;
       if (/responsibilit|requirement|qualification|you will|about the role|what you/i.test(text)) {
         score += 1500;
       }
 
       if (/apply now|similar jobs|people also viewed|cookie|privacy policy|log in|sign up/i.test(text)) {
-        score -= 3000;
+        score -= Math.max(3000, text.length * 0.75);
+      }
+
+      if (isRemoteHubPageWrapper(text)) {
+        score -= Math.max(10000, text.length * 1.5);
       }
 
       if (source === 'NoDesk' && /remote jobs for digital working nomads|find the best remote jobs/i.test(t)) {
@@ -696,6 +796,11 @@ class DetailExtractor {
         score -= 3000;
       }
 
+      if (
+        /join or sign in to find your next job|email or phone|forgot password|sign in with email|new to linkedin|by clicking continue to join or sign in/i.test(text)
+      ) {
+        score -= 10000;
+      }
       return score;
     };
 
@@ -812,6 +917,16 @@ class DetailExtractor {
 
       let description = cleanDescription(cleanHtml(raw.html));
       let selector = raw.selector;
+
+      if (job.source === 'RemoteHub' && isRemoteHubPageWrapper(description)) {
+        return {
+          success: false,
+          description,
+          chars: description.length,
+          reason: 'remotehub_page_wrapper_detected',
+          selector,
+        };
+      }
 
       if (
         isLinkedInSource(job.source) &&

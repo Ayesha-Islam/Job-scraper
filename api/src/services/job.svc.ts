@@ -16,6 +16,96 @@ function normalizePositionKey(position: string): string {
   return position.toLowerCase().trim();
 }
 
+function isLinkedInAuthWall(description: string): boolean {
+  const text = description.toLowerCase().replace(/\s+/g, ' ').trim();
+
+  return [
+    'join or sign in to find your next job',
+    'email or phone',
+    'forgot password',
+    'sign in with email',
+    'new to linkedin',
+    'join now',
+    'by clicking continue to join or sign in',
+    'linkedin user agreement',
+    'linkedin privacy policy',
+    'linkedin cookie policy',
+  ].some(signal => text.includes(signal));
+}
+
+function isJammedNavigationShell(text: string): boolean {
+  const compact = text.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return (
+    compact.includes('closehomehomegeneral') ||
+    compact.includes('homegeneraljobs') ||
+    (compact.includes('generaljobs') && compact.includes('similarjobs'))
+  );
+}
+
+function isRemoteHubPageWrapper(description: string): boolean {
+  const text = description.toLowerCase().replace(/\s+/g, ' ').trim();
+  return (
+    isJammedNavigationShell(description) ||
+    (
+      /\bsimilar jobs\b|\brelated jobs\b|\brecommended jobs\b/i.test(text) &&
+      /\b(home|general|jobs|companies|post a job|sign in|log in|menu|close)\b/i.test(text)
+    )
+  );
+}
+
+function isKnownBadDescription(description: string): boolean {
+  return isLinkedInAuthWall(description) || isRemoteHubPageWrapper(description);
+}
+
+
+function normalizeJobDescription(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+
+  const cleaned = raw
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+
+    // Preserve common HTML headings as markdown-style heading markers.
+    // The UI renders these lines as real headings without injecting HTML.
+    .replace(/<h[1-6][^>]*>/gi, '\n## ')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(
+      /<(p|div)[^>]*>\s*<(strong|b)[^>]*>\s*([\s\S]{2,120}?)\s*<\/\2>\s*<\/\1>/gi,
+      (_match, _block, _bold, text) => `\n## ${text}\n\n`
+    )
+    .replace(
+      /<(strong|b)[^>]*>\s*([^<]{2,120}?)\s*(?:<br\s*\/?>\s*){1,}<\/\1>/gi,
+      (_match, _tag, text) => `\n## ${text}\n\n`
+    )
+
+    // Remove empty/whitespace-only HTML blocks before turning block tags into newlines.
+    .replace(/<(p|div|li|h[1-6])[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/\1>/gi, '')
+
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<(p|div|section|article|ul|ol|li)[^>]*>/gi, '\n')
+    .replace(/<\/(p|div|section|article|ul|ol|li)>/gi, '\n')
+    .replace(/<\/?(a|span|button|mat-icon|mat-chip|small|label|em|i)[^>]*>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+
+    .replace(/[\u00A0\u200B\u200C\u200D\u2028\u2029\uFEFF]/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/^(## .+)\n(?!\n)/gm, '$1\n\n')
+    .trim();
+
+  return cleaned || null;
+}
+
 function normalizeLocationKey(location: string | null | undefined): string {
   const raw = (location ?? 'remote').toLowerCase().trim();
 
@@ -58,7 +148,7 @@ export class JobService {
   constructor(
     private container: Container,
     private cache: CacheService
-  ) {}
+  ) { }
 
 
   private async withDbRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
@@ -105,6 +195,11 @@ export class JobService {
 
     const cleaned = this.removeEmoji(description).trim();
 
+    if (isKnownBadDescription(cleaned)) {
+      if (DEBUG) console.log(chalk.gray('     ⚠️  Description looks like authwall/page-wrapper noise'));
+      return false;
+    }
+
     if (cleaned.length < 80) {
       if (DEBUG) console.log(chalk.gray(`     ⚠️  Description too short (${cleaned.length} chars)`));
       return false;
@@ -140,7 +235,10 @@ export class JobService {
   private cleanDescription(description: string | null | undefined): string | null {
     if (!description) return null;
 
-    let cleaned = this.removeEmoji(description).trim();
+    let cleaned = normalizeJobDescription(description);
+    if (!cleaned) return null;
+
+    cleaned = this.removeEmoji(cleaned).trim();
     if (!cleaned) return null;
 
     cleaned = cleaned
@@ -222,11 +320,11 @@ export class JobService {
         const s = (job.salary as string | null)?.trim();
         return (s && /[\d$\u20ac\u00a3\u00a5\u20b9]/.test(s)) ? s : null;
       })(),
-      type:        job.type,
-      url:         job.url.trim(),
-      source:      job.source.trim(),
-      description: (job.description as string | null)?.trim() || null,
-      companyKey:  normalizeCompanyKey(company),
+      type: job.type,
+      url: job.url.trim(),
+      source: job.source.trim(),
+      description: normalizeJobDescription(job.description as string | null),
+      companyKey: normalizeCompanyKey(company),
       positionKey: normalizePositionKey(position),
       locationKey: normalizeLocationKey(location),
       ...(job.postedAt ? { postedAt: job.postedAt } : {}),
@@ -323,31 +421,35 @@ export class JobService {
           continue;
         }
 
-        const companyKey  = normalizeCompanyKey(norm.company);
+        const companyKey = normalizeCompanyKey(norm.company);
         const positionKey = normalizePositionKey(norm.position);
         const locationKey = normalizeLocationKey(norm.location);
 
         const existing = await this.withDbRetry(() =>
           this.container.db.job.findFirst({
-            where:  { companyKey, positionKey, locationKey },
+            where: { companyKey, positionKey, locationKey },
             select: {
-              id:          true,
+              id: true,
               description: true,
-              postedAt:    true,
-              url:         true,
+              postedAt: true,
+              url: true,
             },
           })
         );
 
         if (existing) {
+          const existingDescription = this.cleanDescription(
+            normalizeJobDescription(existing.description)
+          );
+
           const betterDescription =
-            cleanedDescription.length > (existing.description?.length ?? 0)
+            cleanedDescription.length > (existingDescription?.length ?? 0)
               ? cleanedDescription
-              : existing.description;
+              : existingDescription;
 
           if (betterDescription !== existing.description) {
             descriptionUpdated++;
-            if (DEBUG) console.log(chalk.blue(`     ↻ Better description: ${norm.position}`));
+            if (DEBUG) console.log(chalk.blue(`     ↻ Cleaned/better description: ${norm.position}`));
           }
 
           const incomingPostedAt = norm.postedAt ? new Date(norm.postedAt as string) : null;
@@ -360,12 +462,12 @@ export class JobService {
             this.container.db.job.update({
               where: { id: existing.id },
               data: {
-                url:         norm.url,
-                source:      norm.source,
-                salary:      norm.salary as string | null,
-                type:        norm.type,
-                isActive:    true,
-                scrapedAt:   new Date(),
+                url: norm.url,
+                source: norm.source,
+                salary: norm.salary as string | null,
+                type: norm.type,
+                isActive: true,
+                scrapedAt: new Date(),
                 description: betterDescription,
                 ...(earlierPostedAt ? { postedAt: earlierPostedAt } : {}),
               },
@@ -379,16 +481,16 @@ export class JobService {
           await this.withDbRetry(() =>
             this.container.db.job.create({
               data: {
-                position:    norm.position,
-                company:     norm.company,
-                location:    norm.location as string | null,
-                salary:      norm.salary as string | null,
-                type:        norm.type,
-                url:         norm.url,
-                source:      norm.source,
+                position: norm.position,
+                company: norm.company,
+                location: norm.location as string | null,
+                salary: norm.salary as string | null,
+                type: norm.type,
+                url: norm.url,
+                source: norm.source,
                 description: cleanedDescription,
-                isActive:    true,
-                scrapedAt:   new Date(),
+                isActive: true,
+                scrapedAt: new Date(),
                 companyKey,
                 positionKey,
                 locationKey,
@@ -416,8 +518,8 @@ export class JobService {
     }
 
     if (added > 0 || descriptionUpdated > 0) {
-      await this.cache.deletePattern('stats:*');
-      if (DEBUG) console.log(chalk.gray('   🔄 Stats cache invalidated'));
+      await this.invalidateCaches();
+      if (DEBUG) console.log(chalk.gray('   🔄 Job caches invalidated'));
     }
 
     return { added, duplicates, skipped, descriptionUpdated };

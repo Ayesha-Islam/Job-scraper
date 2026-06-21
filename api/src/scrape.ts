@@ -243,20 +243,38 @@ export function cleanHtml(raw: string): string {
   return raw
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+
+    // Preserve common HTML headings as markdown-style heading markers.
+    .replace(/<h[1-6][^>]*>/gi, '\n## ')
+    .replace(/<\/h[1-6]>/gi, '\n\n')
+    .replace(
+      /<(p|div)[^>]*>\s*<(strong|b)[^>]*>\s*([\s\S]{2,120}?)\s*<\/\2>\s*<\/\1>/gi,
+      (_match, _block, _bold, text) => `\n## ${text}\n\n`
+    )
+    .replace(
+      /<(strong|b)[^>]*>\s*([^<]{2,120}?)\s*(?:<br\s*\/?>\s*){1,}<\/\1>/gi,
+      (_match, _tag, text) => `\n## ${text}\n\n`
+    )
+
+    .replace(/<(p|div|li|h[1-6])[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/\1>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<\/h[1-6]>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<(p|div|section|article|ul|ol|li)[^>]*>/gi, '\n')
+    .replace(/<\/(p|div|section|article|ul|ol|li)>/gi, '\n')
+    .replace(/<\/?(a|span|button|mat-icon|mat-chip|small|label|em|i)[^>]*>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
+    .replace(/[\u00A0\u200B\u200C\u200D\u2028\u2029\uFEFF]/g, ' ')
     .replace(/\r\n/g, '\n')
     .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
+    .replace(/^(## .+)\n(?!\n)/gm, '$1\n\n')
     .trim();
 }
 
@@ -303,12 +321,50 @@ export function cleanDescription(text: string): string {
     return trimmed.length > 0 && NOISE_LINE_PATTERNS.some(re => re.test(trimmed));
   });
 
-  const kept = cutIndex !== -1 ? lines.slice(0, cutIndex) : lines;
+  const trailingTrimmed = cutIndex !== -1 ? lines.slice(0, cutIndex) : lines;
+  const startIndex = trailingTrimmed.findIndex((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (index === 0 && !/^(home|general|jobs|close|menu|breadcrumb)$/i.test(trimmed)) return true;
+    return /^(about the role|about this role|the role|responsibilities|requirements|qualifications|what you('|’)ll do|what you will do|job description|description)$/i.test(trimmed)
+      || /\b(we are looking|we're looking|you will|responsibilities include|requirements include)\b/i.test(trimmed);
+  });
+
+  const kept = startIndex > 0 ? trailingTrimmed.slice(startIndex) : trailingTrimmed;
   return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function isLinkedInAuthWall(text: string): boolean {
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  return [
+    'join or sign in to find your next job',
+    'email or phone',
+    'forgot password',
+    'sign in with email',
+    'new to linkedin',
+    'join now',
+    'by clicking continue to join or sign in',
+    'linkedin user agreement',
+    'linkedin privacy policy',
+    'linkedin cookie policy',
+  ].some(signal => normalized.includes(signal));
+}
+
+function isRemoteHubPageWrapper(text: string): boolean {
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  const compact = normalized.replace(/[^a-z0-9]+/g, '');
+  return (
+    compact.includes('closehomehomegeneral') ||
+    (
+      /\bsimilar jobs\b|\brelated jobs\b|\brecommended jobs\b/i.test(normalized) &&
+      /\b(home|general|jobs|companies|post a job|sign in|log in|menu|close)\b/i.test(normalized)
+    )
+  );
 }
 
 function isLikelyRealDescription(text: string): boolean {
   if (!text || text.trim().length < 80) return false;
+  if (isLinkedInAuthWall(text) || isRemoteHubPageWrapper(text)) return false;
   if (/^(join remote ok|log in general frontpage|learn the skills employers|enhance your skills with courses|frontpage|dark mode|hire remote workers)/i.test(text.trim())) return false;
   return /role|responsibilit|requirement|qualif|experience|engineer|developer|designer|manager|team|we (are|offer|look)|you will|what you/i.test(text);
 }
