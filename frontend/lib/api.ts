@@ -1,14 +1,17 @@
 import { Job, ApiResponse, PaginatedResponse, Stats } from "@/types";
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
+const API_URL =
+  typeof window === 'undefined'
+    ? process.env.INTERNAL_API_URL ?? 'http://backend:3001/api/v1'
+    : process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 async function fetchAPI<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
   const url = `${API_URL}/${cleanEndpoint}`;
-  
-  console.log('🌐 Fetching:', url); 
+
+  console.log('🌐 Fetching:', url);
   try {
     const response = await fetch(url, {
       ...options,
@@ -63,7 +66,7 @@ export async function getJobs(params?: {
   sortBy?: string;
 }): Promise<ApiResponse<PaginatedResponse<Job>>> {
   const searchParams = new URLSearchParams();
-  
+
   if (params?.page) searchParams.append('page', params.page.toString());
   if (params?.limit) searchParams.append('limit', params.limit.toString());
   if (params?.search && params.search.trim()) searchParams.append('search', params.search.trim());
@@ -132,5 +135,5 @@ export async function isJobSaved(
 }
 
 export async function checkHealth(): Promise<{ status: string; timestamp: string }> {
-  return fetchAPI('../../health'); 
+  return fetchAPI('../../health');
 }

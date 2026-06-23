@@ -70,6 +70,7 @@ services:
       PORT: 3000
       AUTH_TRUST_HOST: "true"
       NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+      INTERNAL_API_URL: http://api:3001/api/v1
       AUTH_SECRET: ${AUTH_SECRET:-9GnG0RJstSlVEFAjU5J1kJjC7TWKiK97H0BD6i622SU=}
       NEXTAUTH_SECRET: ${AUTH_SECRET:-9GnG0RJstSlVEFAjU5J1kJjC7TWKiK97H0BD6i622SU=}
     ports:
