@@ -83,10 +83,10 @@ function JobsPageContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0B1421] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-gray-300">Loading jobs...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading jobs...</p>
         </div>
       </div>
     );
@@ -94,12 +94,12 @@ function JobsPageContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0B1421] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-400 mb-4">{error}</p>
+          <p className="text-destructive mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-[#15202B] border-2 border-gray-700 rounded-full hover:bg-[#1a2a3a] transition-colors text-white"
+            className="px-6 py-2 bg-card border-2 border-border rounded-full hover:bg-accent transition-colors text-foreground"
           >
             Retry
           </button>
@@ -127,10 +127,10 @@ export default function JobsPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#0B1421] flex items-center justify-center">
+        <div className="min-h-screen bg-background flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-gray-300">Loading jobs...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading jobs...</p>
           </div>
         </div>
       }

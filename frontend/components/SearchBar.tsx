@@ -44,20 +44,20 @@ export default function SearchBar({
 
   return (
     <div className="relative w-full">
-      <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4.5 h-4.5 text-gray-400 pointer-events-none" />
+      <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground pointer-events-none" />
 
       <Input
         type="text"
         placeholder={placeholder}
         value={searchValue}
         onChange={(e) => setSearchValue(e.target.value)}
-        className="pl-11 pr-11 h-10 text-base border-gray-300 focus:border-primary focus:ring-primary"
+        className="pl-11 pr-11 h-10 text-base border-input focus:border-primary focus:ring-primary"
       />
 
       {searchValue && (
         <button
           onClick={handleClear}
-          className="absolute right-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+          className="absolute right-3.5 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-accent"
           aria-label="Clear search"
           type="button"
         >

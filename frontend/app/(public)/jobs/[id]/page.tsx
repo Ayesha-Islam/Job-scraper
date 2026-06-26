@@ -62,16 +62,16 @@ export default function JobDetailsPage() {
 
   if (error || !job) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <ExternalLink className="w-8 h-8 text-red-600" />
+            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <ExternalLink className="w-8 h-8 text-destructive" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-xl font-semibold text-foreground mb-2">
               Job Not Found
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted-foreground mb-6">
               {error || "The job you're looking for doesn't exist or has been removed."}
             </p>
             <Link href="/jobs">
@@ -87,8 +87,8 @@ export default function JobDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-background">
+      <div className="bg-card border-b border-border">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <Link href="/jobs">
             <Button variant="ghost" className="mb-4 -ml-2 gap-2">
@@ -99,18 +99,18 @@ export default function JobDetailsPage() {
 
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">
                 {job.position}
               </h1>
 
               <div className="flex items-center gap-2 mb-2">
-                <Building2 className="w-5 h-5 text-blue-600" />
-                <span className="text-lg font-medium text-blue-600">
+                <Building2 className="w-5 h-5 text-primary" />
+                <span className="text-lg font-medium text-primary">
                   {job.company}
                 </span>
               </div>
 
-              <div className="flex flex-wrap gap-3 text-sm text-gray-600">
+              <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1.5">
                   <MapPin className="w-4 h-4" />
                   {job.location || "Remote"}
@@ -162,18 +162,18 @@ export default function JobDetailsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Briefcase className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Job Type:</span>
+                  <Briefcase className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Job Type:</span>
                   <Badge
                     variant="secondary"
-                    className="bg-blue-50 text-blue-700"
+                    className="bg-primary/10 text-primary"
                   >
                     {formatJobType(job.type)}
                   </Badge>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Source:</span>
+                  <span className="text-sm text-muted-foreground">Source:</span>
                   <Badge variant="outline">{job.source}</Badge>
                 </div>
               </CardContent>
@@ -187,12 +187,12 @@ export default function JobDetailsPage() {
                 {job.description ? (
                   <div className="prose prose-sm max-w-none">
                     <div
-                      className="text-gray-700 whitespace-pre-wrap leading-relaxed"
+                      className="text-card-foreground whitespace-pre-wrap leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: job.description }}
                     />
                   </div>
                 ) : (
-                  <p className="text-gray-600 italic">
+                  <p className="text-muted-foreground italic">
                     No description available for this job.
                   </p>
                 )}
@@ -215,7 +215,7 @@ export default function JobDetailsPage() {
                   </Button>
                 </a>
 
-                <p className="text-xs text-gray-500 text-center mt-3">
+                <p className="text-xs text-muted-foreground text-center mt-3">
                   You will be redirected to the original job posting
                 </p>
               </CardContent>
@@ -227,34 +227,34 @@ export default function JobDetailsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Company</p>
-                  <p className="font-medium text-gray-900">{job.company}</p>
+                  <p className="text-sm text-muted-foreground mb-1">Company</p>
+                  <p className="font-medium text-foreground">{job.company}</p>
                 </div>
 
                 {job.location && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Location</p>
-                    <p className="font-medium text-gray-900">{job.location}</p>
+                    <p className="text-sm text-muted-foreground mb-1">Location</p>
+                    <p className="font-medium text-foreground">{job.location}</p>
                   </div>
                 )}
 
                 {job.salary && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Salary</p>
-                    <p className="font-medium text-gray-900">{job.salary}</p>
+                    <p className="text-sm text-muted-foreground mb-1">Salary</p>
+                    <p className="font-medium text-foreground">{job.salary}</p>
                   </div>
                 )}
 
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Job Type</p>
-                  <p className="font-medium text-gray-900">
+                  <p className="text-sm text-muted-foreground mb-1">Job Type</p>
+                  <p className="font-medium text-foreground">
                     {formatJobType(job.type)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Posted</p>
-                  <p className="font-medium text-gray-900">
+                  <p className="text-sm text-muted-foreground mb-1">Posted</p>
+                  <p className="font-medium text-foreground">
                     {formatRelativeTime(job.createdAt)}
                   </p>
                 </div>
@@ -269,8 +269,8 @@ export default function JobDetailsPage() {
 
 function JobDetailsSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-background">
+      <div className="bg-card border-b border-border">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <Skeleton className="h-10 w-32 mb-4" />
           <Skeleton className="h-8 w-3/4 mb-3" />

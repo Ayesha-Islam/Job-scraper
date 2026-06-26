@@ -28,7 +28,7 @@ export default function App() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0B1421]">
+        <div className="min-h-screen bg-background text-foreground">
             {currentScreen === 'landing' && (
                 <Landing
                     onGetStarted={() => setCurrentScreen('signin')}

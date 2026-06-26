@@ -12,10 +12,10 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
   return (
     <button
       onClick={() => onChange(!enabled)}
-      className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${enabled ? "bg-[#15202B] border border-white/30" : "bg-white/10 border border-white/10"
+      className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${enabled ? "bg-primary border border-border" : "bg-muted border border-border"
         }`}
     >
-      <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full transition-transform duration-200 ${enabled ? "translate-x-5 bg-white" : "translate-x-0 bg-gray-500"
+      <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full transition-transform duration-200 ${enabled ? "translate-x-5 bg-popover" : "translate-x-0 bg-background0"
         }`} />
     </button>
   );
@@ -24,19 +24,19 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#0f1923] overflow-hidden">
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2.5 px-4 py-3 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center gap-2.5 px-4 py-3 border-b border-border hover:bg-accent/50 transition-colors"
       >
-        <span className="text-gray-500">{icon}</span>
-        <h2 className="text-sm font-semibold text-gray-300 flex-1 text-left">{title}</h2>
+        <span className="text-muted-foreground">{icon}</span>
+        <h2 className="text-sm font-semibold text-foreground flex-1 text-left">{title}</h2>
         <ChevronDown
           size={16}
-          className={`text-gray-500 transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"}`}
+          className={`text-muted-foreground transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"}`}
         />
       </button>
-      {open && <div className="divide-y divide-white/[0.04]">{children}</div>}
+      {open && <div className="divide-y divide-border">{children}</div>}
     </div>
   );
 }
@@ -47,8 +47,8 @@ function SettingRow({
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="min-w-0">
-        <p className="text-sm text-gray-200">{label}</p>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        <p className="text-sm text-foreground">{label}</p>
+        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
       </div>
       <div className="flex-shrink-0">{action}</div>
     </div>
@@ -104,12 +104,12 @@ export default function SettingsPage() {
         value={passwords[key]}
         onChange={e => setPasswords(p => ({ ...p, [key]: e.target.value }))}
         placeholder={key === "current" ? "Current password" : key === "next" ? "New password" : "Confirm new password"}
-        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-white/30 pr-9"
+        className="w-full bg-muted border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring pr-9"
       />
       <button
         type="button"
         onClick={() => setShowPw(p => ({ ...p, [key]: !p[key] }))}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
       >
         {showPw[key] ? <EyeOff size={14} /> : <Eye size={14} />}
       </button>
@@ -117,12 +117,12 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0B1421] pt-24 pb-16 px-4">
+    <div className="min-h-screen bg-background pt-24 pb-16 px-4">
       <div className="max-w-2xl mx-auto space-y-5">
 
         <div className="mb-2">
-          <h1 className="text-2xl font-bold text-white">Settings</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage your account preferences</p>
+          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage your account preferences</p>
         </div>
 
         <Section title="Account & Security" icon={<Lock size={15} />}>
@@ -132,26 +132,26 @@ export default function SettingsPage() {
             description={session?.user?.email || "Not set"}
             action={
               <Button size="sm" variant="ghost"
-                className="text-xs text-gray-400 hover:text-white hover:bg-white/10 flex items-center gap-1">
+                className="text-xs text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1">
                 Change <ChevronRight size={12} />
               </Button>
             }
           />
 
           <div className="px-4 py-4 space-y-3">
-            <p className="text-sm text-gray-200">Change Password</p>
+            <p className="text-sm text-foreground">Change Password</p>
             {pwInput("current")}
             {pwInput("next")}
             {pwInput("confirm")}
             {passwords.next && passwords.confirm && passwords.next !== passwords.confirm && (
-              <p className="text-xs text-red-400">Passwords don't match</p>
+              <p className="text-xs text-destructive">Passwords don't match</p>
             )}
             <Button
               onClick={handleSavePassword}
               disabled={!passwords.current || !passwords.next || passwords.next !== passwords.confirm}
-              className="w-full bg-[#15202B] border border-white/20 hover:bg-[#1e2d3d] text-white text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-card border border-border hover:bg-accent text-foreground text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {pwSaved ? <><Check size={14} className="text-green-400" /> Saved!</> : "Update Password"}
+              {pwSaved ? <><Check size={14} className="text-primary" /> Saved!</> : "Update Password"}
             </Button>
           </div>
 
@@ -160,7 +160,7 @@ export default function SettingsPage() {
             description="Add an extra layer of security"
             action={
               <Button size="sm" variant="ghost"
-                className="text-xs text-gray-400 hover:text-white hover:bg-white/10 flex items-center gap-1 border border-white/10">
+                className="text-xs text-muted-foreground hover:text-foreground hover:bg-accent flex items-center gap-1 border border-border">
                 Enable <ChevronRight size={12} />
               </Button>
             }
@@ -169,7 +169,7 @@ export default function SettingsPage() {
 
         <Section title="Notifications" icon={<Bell size={15} />}>
           <div className="px-4 pt-2 pb-1">
-            <p className="text-xs text-gray-600 uppercase tracking-wider mb-1">Email</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Email</p>
           </div>
           <SettingRow
             label="Job Alerts"
@@ -188,7 +188,7 @@ export default function SettingsPage() {
           />
 
           <div className="px-4 pt-3 pb-1">
-            <p className="text-xs text-gray-600 uppercase tracking-wider mb-1">Push</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Push</p>
           </div>
           <SettingRow
             label="New Jobs"
@@ -202,7 +202,7 @@ export default function SettingsPage() {
           />
 
           <div className="px-4 pt-3 pb-1">
-            <p className="text-xs text-gray-600 uppercase tracking-wider mb-1">SMS</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">SMS</p>
           </div>
           <SettingRow
             label="SMS Alerts"
@@ -257,18 +257,18 @@ export default function SettingsPage() {
           />
         </Section>
 
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.03] overflow-hidden">
-          <div className="flex items-center gap-2.5 px-4 py-3 border-b border-red-500/10">
-            <AlertTriangle size={15} className="text-red-500/70" />
-            <h2 className="text-sm font-semibold text-red-400/80">Danger Zone</h2>
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 overflow-hidden">
+          <div className="flex items-center gap-2.5 px-4 py-3 border-b border-destructive/10">
+            <AlertTriangle size={15} className="text-destructive/70" />
+            <h2 className="text-sm font-semibold text-destructive/80">Danger Zone</h2>
           </div>
-          <div className="divide-y divide-red-500/[0.06]">
+          <div className="divide-y divide-destructive/10">
             <SettingRow
               label="Sign Out"
               description="Revoke active sessions"
               action={
                 <Button size="sm" variant="ghost"
-                  className="text-xs border border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                  className="text-xs border border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => signOut({ callbackUrl: "/" })}>
                   Sign Out
                 </Button>
@@ -276,26 +276,26 @@ export default function SettingsPage() {
             />
             <div className="px-4 py-4 space-y-3">
               <div>
-                <p className="text-sm text-gray-200">Delete Account</p>
-                <p className="text-xs text-gray-500 mt-0.5">Permanently remove your account and all data. This cannot be undone.</p>
+                <p className="text-sm text-foreground">Delete Account</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Permanently remove your account and all data. This cannot be undone.</p>
               </div>
               {!deleteConfirm ? (
                 <Button size="sm" variant="ghost"
                   onClick={() => setDeleteConfirm(true)}
-                  className="text-xs border border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300">
+                  className="text-xs border border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive">
                   <Trash2 size={13} className="mr-1.5" /> Delete My Account
                 </Button>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-xs text-red-400 font-medium">Are you absolutely sure?</p>
+                  <p className="text-xs text-destructive font-medium">Are you absolutely sure?</p>
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost"
                       onClick={() => setDeleteConfirm(false)}
-                      className="text-xs text-gray-400 hover:text-white hover:bg-white/10">
+                      className="text-xs text-muted-foreground hover:text-foreground hover:bg-accent">
                       Cancel
                     </Button>
                     <Button size="sm"
-                      className="text-xs bg-red-600 hover:bg-red-700 text-white border-0">
+                      className="text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground border-0">
                       Yes, delete everything
                     </Button>
                   </div>

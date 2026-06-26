@@ -84,10 +84,10 @@ export default function SavedPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-[#d4c4bb] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mx-auto mb-4"></div>
-          <p className="text-gray-700">Loading saved jobs...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-border mx-auto mb-4"></div>
+          <p className="text-foreground">Loading saved jobs...</p>
         </div>
       </div>
     );

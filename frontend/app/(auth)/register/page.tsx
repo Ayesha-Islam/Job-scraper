@@ -8,7 +8,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { registerUser } from "@/lib/api"; 
+import { registerUser } from "@/lib/api";
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -66,7 +66,7 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12 text-black">
+        <div className="min-h-screen flex items-center justify-center bg-background pt-12 text-foreground">
             <Card className="w-full max-w-md">
                 <CardHeader>
                     <CardTitle className="text-2xl font-bold">Register</CardTitle>
@@ -75,7 +75,7 @@ export default function RegisterPage() {
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-4">
                         {error && (
-                            <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-md">
+                            <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md">
                                 {error}
                             </div>
                         )}
@@ -100,8 +100,8 @@ export default function RegisterPage() {
                         <Button type="submit" className="w-full" disabled={isLoading}>
                             {isLoading ? "Processing..." : "Create Account"}
                         </Button>
-                        <p className="text-sm text-gray-600">
-                            Already have an account? <Link href="/login" className="text-blue-600 hover:underline">Sign in</Link>
+                        <p className="text-sm text-muted-foreground">
+                            Already have an account? <Link href="/login" className="text-primary hover:underline">Sign in</Link>
                         </p>
                     </CardFooter>
                 </form>

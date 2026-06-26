@@ -29,23 +29,23 @@ export function SavedJobs({ jobs, savedJobs, onNavigateToBrowse, onUnsaveJob }: 
   });
 
   return (
-    <div className="min-h-screen bg-[#0B1421]">
-      <div className="border-b-2 border-black">
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="border-b-2 border-border">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <button
             onClick={onNavigateToBrowse}
-            className="flex items-center gap-2 mb-6 text-gray-700 hover:text-black transition-colors"
+            className="flex items-center gap-2 mb-6 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             <span className="text-sm font-medium">Back to Browse Jobs</span>
           </button>
 
-          <div className="text-center text-[#FFFFFF] mb-6">
+          <div className="text-center text-foreground mb-6">
             <div className="flex items-center justify-center gap-3 mb-2">
-              <Bookmark className="w-8 h-8 fill-black" />
+              <Bookmark className="w-8 h-8 fill-primary text-primary" />
               <h1 className="text-4xl font-bold">Saved Jobs</h1>
             </div>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               {jobs.length === 0
                 ? "You haven't saved any jobs yet"
                 : `You have ${jobs.length} saved job${jobs.length === 1 ? '' : 's'}`
@@ -56,13 +56,13 @@ export function SavedJobs({ jobs, savedJobs, onNavigateToBrowse, onUnsaveJob }: 
           {jobs.length > 0 && (
             <div className="max-w-2xl mx-auto">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search saved jobs..."
-                  className="w-full pl-12 pr-4 py-3 bg-white border-2 border-black rounded-full placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  className="w-full pl-12 pr-4 py-3 bg-background border-2 border-input rounded-full placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
             </div>
@@ -83,22 +83,22 @@ export function SavedJobs({ jobs, savedJobs, onNavigateToBrowse, onUnsaveJob }: 
         {jobs.length === 0 ? (
           <div className="text-center py-16">
             <div className="mb-6">
-              <Bookmark className="w-24 h-24 mx-auto text-gray-300 stroke-gray-400" />
+              <Bookmark className="w-24 h-24 mx-auto text-muted-foreground stroke-muted-foreground" />
             </div>
-            <h2 className="text-2xl font-bold mb-3 text-gray-700">No Saved Jobs Yet</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="text-2xl font-bold mb-3 text-foreground">No Saved Jobs Yet</h2>
+            <p className="text-muted-foreground mb-6">
               Start browsing jobs and save the ones you're interested in!
             </p>
             <button
               onClick={onNavigateToBrowse}
-              className="px-8 py-3 bg-[#b8a8d8] border-2 border-black rounded-full text-sm font-medium hover:bg-[#a898c8] transition-colors"
+              className="px-8 py-3 bg-primary text-primary-foreground border-2 border-border rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
             >
               Browse All Jobs
             </button>
           </div>
         ) : filteredJobs.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-gray-600">No jobs match your search.</p>
+            <p className="text-muted-foreground">No jobs match your search.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

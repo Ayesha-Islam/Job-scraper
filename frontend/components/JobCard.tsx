@@ -46,7 +46,7 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
   return (
     <Card
       onClick={onClick}
-      className={`relative bg-[#15202B] border-none hover:shadow-2xl hover:scale-[1.02] hover:border-gray-800 transition-all duration-300 cursor-pointer group flex flex-col ${compact ? 'h-full' : ''
+      className={`relative bg-card border-none hover:shadow-2xl hover:scale-[1.02] hover:border-border transition-all duration-300 cursor-pointer group flex flex-col ${compact ? 'h-full' : ''
         }`}
     >
       <Button
@@ -56,10 +56,10 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
         }}
         variant="ghost"
         size="icon"
-        className="absolute top-4 right-4 z-10 hover:bg-white/10 rounded-full"
+        className="absolute top-4 right-4 z-10 hover:bg-popover/10 rounded-full"
       >
         <Bookmark
-          className={`w-5 h-5 transition-all ${isSaved ? 'fill-white stroke-white' : 'stroke-white hover:fill-white/50'
+          className={`w-5 h-5 transition-all ${isSaved ? 'fill-primary stroke-primary' : 'stroke-primary hover:fill-primary/50'
             }`}
         />
       </Button>
@@ -67,8 +67,8 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
       <CardHeader className="pb-3">
         {!compact && (
           <div className="pr-12">
-            <h3 className="font-bold text-lg text-[#FFFFFF] leading-tight mb-1">{job.position}</h3>
-            <div className="flex items-center gap-1 text-xs text-[#FFFFFF]">
+            <h3 className="font-bold text-lg text-foreground leading-tight mb-1">{job.position}</h3>
+            <div className="flex items-center gap-1 text-xs text-foreground">
               <Building2 className="w-4 h-4" />
               <p>{job.company}</p>
             </div>
@@ -77,9 +77,9 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
 
         {compact && (
           <div className="pr-12">
-            <h3 className="font-bold text-sm mb-1 line-clamp-2 text-[#FFFFFF]">{job.position}</h3>
-            <p className="text-xs text-[#FFFFFF] flex items-center gap-1">
-              <Building2 className="w-3 h-3 text-[#FFFFFF]" />
+            <h3 className="font-bold text-sm mb-1 line-clamp-2 text-foreground">{job.position}</h3>
+            <p className="text-xs text-foreground flex items-center gap-1">
+              <Building2 className="w-3 h-3 text-foreground" />
               {job.company}
             </p>
           </div>
@@ -92,28 +92,28 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
             {/* Job Details Badges */}
             <div className="flex flex-wrap gap-2">
               {job.location && (
-                <Badge variant="outline" className="bg-white border-black">
+                <Badge variant="outline" className="bg-popover border-border">
                   <MapPin className="w-3 h-3 mr-1" />
                   {job.location}
                 </Badge>
               )}
 
               {job.type && (
-                <Badge variant="outline" className="bg-white border-black">
+                <Badge variant="outline" className="bg-popover border-border">
                   <Briefcase className="w-3 h-3 mr-1" />
                   {formatJobType(job.type)}
                 </Badge>
               )}
 
               {job.salary && (
-                <Badge variant="outline" className="bg-white border-black">
+                <Badge variant="outline" className="bg-popover border-border">
                   <DollarSign className="w-3 h-3 mr-1" />
                   {job.salary}
                 </Badge>
               )}
 
               {relativeTimeSource && (
-                <Badge variant="outline" className="bg-white border-black">
+                <Badge variant="outline" className="bg-popover border-border">
                   <Clock className="w-3 h-3 mr-1" />
                   {formatRelativeTime(relativeTimeSource)}
                 </Badge>
@@ -121,19 +121,19 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
             </div>
 
             {descriptionPreview && (
-              <p className="text-sm text-white line-clamp-2 leading-relaxed">
+              <p className="text-sm text-foreground line-clamp-2 leading-relaxed">
                 {descriptionPreview}
               </p>
             )}
 
             {job.source && (
-              <Badge variant="secondary" className="bg-[#FFFFFF] border border-black">
+              <Badge variant="secondary" className="bg-popover border border-border">
                 Source: {job.source}
               </Badge>
             )}
           </CardContent>
 
-          <CardFooter className="pt-2 pb-4 mt-auto">
+          <CardFooter className=" pb-4 mt-auto">
             <Button
               onClick={(e) => {
                 e.stopPropagation();
@@ -141,7 +141,7 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
                   window.open(job.url, '_blank');
                 }
               }}
-              className="w-full bg-[#0B1421] text-[#FFFFFF] hover:bg-[#FFFFFF] hover:text-black transition-colors"
+              className="w-full bg-background text-foreground hover:bg-popover hover:text-primary-foreground transition-colors"
             >
               Quick Apply
             </Button>
@@ -152,7 +152,7 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
       {compact && (
         <CardContent className="pt-0">
           {job.location && (
-            <Badge variant="outline" className="bg-white border-black">
+            <Badge variant="outline" className="bg-popover border-border">
               <MapPin className="w-3 h-3 mr-1" />
               {job.location}
             </Badge>

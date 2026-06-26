@@ -70,7 +70,7 @@ export default function Pagination({
         {pageNumbers.map((page, index) => {
           if (page === "...") {
             return (
-              <span key={`ellipsis-${index}`} className="px-2 text-gray-400 text-sm">
+              <span key={`ellipsis-${index}`} className="px-2 text-muted-foreground text-sm">
                 ...
               </span>
             );
@@ -85,11 +85,10 @@ export default function Pagination({
               variant={isActive ? "default" : "outline"}
               size="sm"
               onClick={() => onPageChange(pageNum)}
-              className={`h-9 w-9 p-0 ${
-                isActive 
-                  ? "bg-primary text-white" 
-                  : "hover:bg-gray-100"
-              }`}
+              className={`h-9 w-9 p-0 ${isActive
+                  ? "bg-primary text-foreground"
+                  : "hover:bg-accent"
+                }`}
             >
               {pageNum}
             </Button>

@@ -29,19 +29,19 @@ export function Landing({ onGetStarted, onBrowseJobs }: LandingProps) {
   };
 
   return (
-    <div className="min-h-screen  bg-[#0B1421] flex items-center justify-center p-4">
+    <div className="min-h-screen  bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         <Card className="bg-transparent border-0 shadow-none">
           <CardContent className="p-8 md:p-12">
             <form onSubmit={handleSearch} className="mb-8">
               <div className="relative max-w-2xl mx-auto">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search for jobs, companies, or keywords..."
-                  className="pl-12 pr-32 py-6 text-lg bg-white border border-gray-300 rounded-full focus:border-gray-800 focus:ring-gray-300"
+                  className="pl-12 pr-32 py-6 text-lg bg-popover border border-border rounded-full focus:border-ring focus:ring-ring"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       handleSearch(e);
@@ -50,7 +50,7 @@ export function Landing({ onGetStarted, onBrowseJobs }: LandingProps) {
                 />
                 <Button
                   type="submit"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full bg-[#0B1421] hover:bg-black text-white px-6"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full bg-background hover:bg-primary text-foreground px-6"
                   size="lg"
                 >
                   Search
@@ -59,7 +59,7 @@ export function Landing({ onGetStarted, onBrowseJobs }: LandingProps) {
             </form>
 
             <div className="text-center space-y-6">
-              <p className="text-[#FFFFFF] text-base">
+              <p className="text-foreground text-base">
                 Create an account or sign in to get<br />
                 your personalized job recommendations
               </p>
@@ -67,7 +67,7 @@ export function Landing({ onGetStarted, onBrowseJobs }: LandingProps) {
                 <Button
                   onClick={handleGetStarted}
                   size="lg"
-                  className="bg-[#15202B] hover:bg-black text-white text-lg rounded-full shadow-lg hover:shadow-xl transition-all"
+                  className="bg-card hover:bg-primary text-foreground text-lg rounded-full shadow-lg hover:shadow-xl transition-all"
                 >
                   Get Started
                   <ArrowRight className="ml-2 h-5 w-5" />

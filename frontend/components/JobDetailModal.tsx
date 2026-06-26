@@ -66,14 +66,14 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] bg-[#0B1421] border border-gray-700">
-        <DialogHeader className="p-6 pb-4">
+      <DialogContent className="max-w-3xl max-h-[86vh] bg-background border border-border">
+        <DialogHeader className="p-2 pb-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <DialogTitle className="text-2xl font-bold mb-2 text-[#FFFFFF]">
+              <DialogTitle className="text-2xl font-bold mb-2 text-foreground">
                 {job.position}
               </DialogTitle>
-              <DialogDescription className="flex items-center gap-2 text-base text-gray-700">
+              <DialogDescription className="flex items-center gap-2 text-base text-muted-foreground">
                 <Building2 className="w-4 h-4" />
                 <span className="font-medium">{job.company}</span>
               </DialogDescription>
@@ -86,8 +86,8 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
                 onSave();
               }}
               className={isSaved
-                ? "bg-gray-800 hover:bg-gray-700"
-                : "hover:bg-gray-100 border-gray-300"
+                ? "bg-primary hover:bg-muted"
+                : "hover:bg-accent border-border"
               }
             >
               <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
@@ -96,36 +96,36 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
         </DialogHeader>
 
         <ScrollArea className="max-h-[calc(90vh-200px)]">
-          <div className="p-6 space-y-6">
+          <div className="space-y-6">
             <div className="flex flex-wrap gap-2">
               {job.location && (
-                <Badge variant="secondary" className="bg-white border border-gray-300 hover:text-white">
+                <Badge variant="secondary" className="bg-popover border border-border hover:text-foreground">
                   <MapPin className="w-4 h-4 mr-1.5" />
                   {job.location}
                 </Badge>
               )}
 
-              <Badge variant="secondary" className="bg-white border border-gray-300 hover:text-white">
+              <Badge variant="secondary" className="bg-popover border border-border hover:text-foreground">
                 <Briefcase className="w-4 h-4 mr-1.5" />
                 {formatJobType(job.type)}
               </Badge>
 
               {job.salary && (
-                <Badge variant="secondary" className="bg-white border border-gray-300 hover:text-white">
+                <Badge variant="secondary" className="bg-popover border border-border hover:text-foreground">
                   <DollarSign className="w-4 h-4 mr-1.5" />
                   {job.salary}
                 </Badge>
               )}
 
               {job.source && (
-                <Badge variant="secondary" className="bg-white border border-gray-300 hover:text-white">
+                <Badge variant="secondary" className="bg-popover border border-border hover:text-foreground">
                   <Globe className="w-4 h-4 mr-1.5" />
                   {job.source}
                 </Badge>
               )}
 
               {relativeTimeSource && (
-                <Badge variant="outline" className="text-[#FFFFFF] border-gray-300 hover:text-white">
+                <Badge variant="outline" className="text-foreground border-border hover:text-foreground">
                   <Clock className="w-4 h-4 mr-1.5" />
                   {formatRelativeTime(relativeTimeSource)}
                 </Badge>
@@ -136,15 +136,15 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
 
             {descriptionBlocks.length > 0 && (
               <div>
-                <h3 className="font-bold text-lg mb-3 text-gray-700">Job Description</h3>
+                <h3 className="font-bold text-lg mb-3 text-muted-foreground">Job Description</h3>
                 <div className="space-y-4">
                   {descriptionBlocks.map((block, index) => (
                     block.type === 'heading' ? (
-                      <h4 key={index} className="text-white font-semibold text-base mt-5 first:mt-0">
+                      <h4 key={index} className="text-foreground font-semibold text-base mt-5 first:mt-0">
                         {block.text}
                       </h4>
                     ) : (
-                      <p key={index} className="text-white leading-relaxed whitespace-pre-wrap break-words">
+                      <p key={index} className="text-foreground leading-relaxed whitespace-pre-wrap break-words">
                         {block.text}
                       </p>
                     )
@@ -155,16 +155,16 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
 
             {descriptionBlocks.length === 0 && (
               <div className="text-center py-8">
-                <p className="text-gray-300">No detailed description available</p>
+                <p className="text-muted-foreground">No detailed description available</p>
               </div>
             )}
           </div>
         </ScrollArea>
 
-        <div className="p-6 pt-4">
+        <div className="p-6 pt-2">
           <Button
             asChild
-            className="w-full bg-[#15202B] hover:bg-gray-800 text-white"
+            className="w-full bg-card hover:bg-primary text-foreground hover:text-background "
             size="lg"
           >
             <a

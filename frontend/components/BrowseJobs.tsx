@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Search, ChevronLeft, ChevronRight, Grid3x3, LayoutGrid, MapPin } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Grid3x3, LayoutGrid, MapPin, SlidersHorizontal } from 'lucide-react';
 import { Job } from '@/types';
 import { JobCard } from './JobCard';
 import { JobDetailModal } from './JobDetailModal';
@@ -112,33 +112,33 @@ export function BrowseJobs({
   const activeFilterCount = filters.jobTypes.length + (filters.remote !== null ? 1 : 0);
 
   return (
-    <div className="min-h-screen bg-[#0B1421] pt-24">
+    <div className="min-h-screen bg-background pt-24">
       <div className="mx-auto max-w-7xl p-8">
         <div className="px-6 py-6">
           <div className="text-center mb-6">
-            <h1 className="text-6xl text-[#FFFFFF] font-bold mb-2">Browse All Jobs</h1>
-            <p className="text-sm text-[#FFFFFF]">
+            <h1 className="text-6xl text-foreground font-bold mb-2">Browse All Jobs</h1>
+            <p className="text-sm text-foreground">
               Explore all available roles or discover curated AI recommendations
             </p>
             {totalJobs > 0 && (
-              <Badge variant="secondary" className="mt-2 bg-[#15202B] text-white hover:bg-gray-800">
+              <Badge variant="secondary" className="mt-2 bg-card text-foreground hover:bg-primary">
                 {jobs.length} of {totalJobs} jobs
               </Badge>
             )}
           </div>
 
-          <Card className="transition-colors border-none shadow-none bg-[#15202B]">
+          <Card className="transition-colors border-none shadow-none bg-card">
             <CardContent>
               <div className="flex items-center justify-center gap-3 pt-4">
-                <div className="flex-1 flex items-center gap-3 bg-[#0B1421] border border-gray-700 shadow-sm hover:shadow-md transition-shadow py-1.5 px-2 rounded-md">
+                <div className="flex-1 flex items-center gap-3 bg-background border border-border shadow-sm hover:shadow-md transition-shadow py-1.5 px-2 rounded-md">
                   <div className="flex items-center flex-1 group">
-                    <Search className="w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors ml-1" />
+                    <Search className="w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors ml-1" />
                     <Input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Job title, keywords, or company"
-                      className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-700 placeholder:text-gray-500 h-11"
+                      className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground placeholder:text-muted-foreground h-11"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           fetchFilteredJobs(1);
@@ -148,13 +148,13 @@ export function BrowseJobs({
                   </div>
 
                   <div className="flex items-center flex-1 group">
-                    <MapPin className="w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors ml-1" />
+                    <MapPin className="w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors ml-1" />
                     <Input
                       type="text"
                       value={locationQuery}
                       onChange={(e) => setLocationQuery(e.target.value)}
                       placeholder="Location"
-                      className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-700 h-11"
+                      className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-muted-foreground h-11"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           fetchFilteredJobs(1);
@@ -165,7 +165,7 @@ export function BrowseJobs({
 
                   <Button
                     onClick={() => fetchFilteredJobs(1)}
-                    className="bg-gray-800 hover:bg-black text-white font-semibold h-9 px-8 transition-colors"
+                    className="bg-primary hover:bg-primary text-background font-semibold h-9 px-8 transition-colors"
                     size="sm"
                   >
                     Search
@@ -174,10 +174,36 @@ export function BrowseJobs({
 
                 <div className="flex gap-2">
                   <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={onToggleFilters}
+                    className={`h-11 w-11 hover:bg-accent ${showFilters ? 'bg-background text-foreground border-primary' : ''
+                      }`}
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() =>
+                      setViewMode((current) => current === 'grid' ? 'masonry' : 'grid')
+                    }
+                    className="h-11 w-11 bg-background text-foreground hover:bg-primary"
+                  >
+                    {viewMode === 'grid' ? (
+                      <LayoutGrid className="h-4 w-4" />
+                    ) : (
+                      <Grid3x3 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+                {/* <div className="flex gap-2">
+                  <Button
                     variant={viewMode === 'grid' ? 'default' : 'outline'}
                     size="icon"
                     onClick={() => setViewMode('grid')}
-                    className={`h-11 w-11  ${viewMode === 'grid' ? 'bg-[#0B1421] text-[#FFFFFF]  hover:bg-gray-800' : 'hover:bg-gray-100 '}`}
+                    className={`h-11 w-11  ${viewMode === 'grid' ? 'bg-background text-foreground  hover:bg-primary' : 'hover:bg-accent '}`}
                   >
                     <LayoutGrid className="h-4 w-4" />
                   </Button>
@@ -185,11 +211,11 @@ export function BrowseJobs({
                     variant={viewMode === 'masonry' ? 'default' : 'outline'}
                     size="icon"
                     onClick={() => setViewMode('masonry')}
-                    className={`h-11 w-11 ${viewMode === 'masonry' ? 'bg-[#0B1421]  text-[#FFFFFF] hover:bg-gray-800' : 'hover:bg-gray-100'}`}
+                    className={`h-11 w-11 ${viewMode === 'masonry' ? 'bg-background  text-foreground hover:bg-primary' : 'hover:bg-accent'}`}
                   >
                     <Grid3x3 className="h-4 w-4" />
                   </Button>
-                </div>
+                </div> */}
               </div>
             </CardContent>
           </Card>
@@ -216,12 +242,12 @@ export function BrowseJobs({
             <div className="mb-6 flex flex-wrap gap-2 items-center">
               <span className="text-sm font-medium">Active filters:</span>
               {filters.jobTypes.map(type => (
-                <Badge key={type} variant="secondary" className="bg-black text-white hover:bg-gray-800">
+                <Badge key={type} variant="secondary" className="bg-primary text-foreground hover:bg-primary">
                   {type.toLowerCase().replace('_', ' ')}
                 </Badge>
               ))}
               {filters.remote !== null && (
-                <Badge variant="secondary" className="bg-black text-white hover:bg-gray-800">
+                <Badge variant="secondary" className="bg-primary text-foreground hover:bg-primary">
                   {filters.remote ? 'Remote' : 'On-site'}
                 </Badge>
               )}
@@ -229,7 +255,7 @@ export function BrowseJobs({
                 variant="ghost"
                 size="sm"
                 onClick={() => handleApplyFilters({ jobTypes: [], remote: null, salaryRange: 'any', experience: [] })}
-                className="hover:bg-gray-100"
+                className="hover:bg-accent"
               >
                 Clear all
               </Button>
@@ -239,7 +265,7 @@ export function BrowseJobs({
           {loading && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[...Array(6)].map((_, i) => (
-                <Card key={i} className="border-2 border-gray-200">
+                <Card key={i} className="border-2 border-border">
                   <CardContent className="p-6">
                     <div className="space-y-3">
                       <Skeleton className="h-4 w-3/4" />
@@ -287,7 +313,7 @@ export function BrowseJobs({
               )}
 
               {filteredJobs.length === 0 && !loading && (
-                <Card className="mt-12 border-2 border-gray-200">
+                <Card className="mt-12 border-2 border-border">
                   <CardContent className="p-12 text-center">
                     <div className="mx-auto w-16 h-16 mb-4 rounded-full bg-muted flex items-center justify-center">
                       <Search className="h-8 w-8 text-muted-foreground" />
@@ -303,7 +329,7 @@ export function BrowseJobs({
                         setLocationQuery('');
                         handleApplyFilters({ jobTypes: [], remote: null, salaryRange: 'any', experience: [] });
                       }}
-                      className="hover:bg-gray-100"
+                      className="hover:bg-accent"
                     >
                       Clear all filters
                     </Button>
@@ -320,7 +346,7 @@ export function BrowseJobs({
                       size="icon"
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
-                      className="hover:bg-gray-100"
+                      className="hover:bg-accent"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
@@ -345,8 +371,8 @@ export function BrowseJobs({
                             size="icon"
                             onClick={() => handlePageChange(pageNum)}
                             className={`w-10 h-10 ${currentPage === pageNum
-                              ? 'bg-gray-800 text-[#FFFFFF] hover:bg-gray-800'
-                              : 'hover:bg-gray-100'
+                              ? 'bg-primary text-foreground hover:bg-primary'
+                              : 'hover:bg-accent'
                               }`}
                           >
                             {pageNum}
@@ -360,13 +386,13 @@ export function BrowseJobs({
                       size="icon"
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      className="hover:bg-gray-100"
+                      className="hover:bg-accent"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
 
-                  <p className="text-center text-[#FFFFFF]  text-sm mt-4">
+                  <p className="text-center text-foreground  text-sm mt-4">
                     Page {currentPage} of {totalPages}
                   </p>
                 </div>

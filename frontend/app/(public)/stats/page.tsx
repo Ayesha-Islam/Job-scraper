@@ -45,13 +45,13 @@ export default function StatsPage() {
 
   if (error || !stats) {
     return (
-      <div className="min-h-screen bg-[#0B1421] py-12">
+      <div className="min-h-screen bg-background py-12">
         <div>
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            <h1 className="text-3xl font-bold text-foreground mb-4">
               Market Statistics
             </h1>
-            <p className="text-red-600">{error}</p>
+            <p className="text-destructive">{error}</p>
           </div>
         </div>
       </div>
@@ -59,14 +59,14 @@ export default function StatsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1421] pt-14">
+    <div className="min-h-screen bg-background pt-14">
       <div>
         <div className="py-8 ">
           <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-3xl sm:text-4xl font-bold text-[#FFFFFF] mb-3">
+            <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-3">
               Remote Job Market Statistics
             </h1>
-            <p className="text-gray-400 text-base sm:text-lg">
+            <p className="text-muted-foreground text-base sm:text-lg">
               Real-time insights into the remote job market. Data updated every 30 minutes.
             </p>
           </div>
@@ -105,10 +105,10 @@ export default function StatsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="border border-gray-600">
+          <Card className="border border-border">
             <CardHeader>
-              <CardTitle className="flex items-center text-white gap-2">
-                <Globe className="w-5 h-5 text-blue-600" />
+              <CardTitle className="flex items-center text-foreground gap-2">
+                <Globe className="w-5 h-5 text-primary" />
                 Jobs by Source
               </CardTitle>
             </CardHeader>
@@ -129,10 +129,10 @@ export default function StatsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border border-gray-600">
+          <Card className="border border-border">
             <CardHeader>
-              <CardTitle className="flex items-center text-white gap-2">
-                <Users className="w-5 h-5 text-green-600" />
+              <CardTitle className="flex items-center text-foreground gap-2">
+                <Users className="w-5 h-5 text-primary" />
                 Jobs by Type
               </CardTitle>
             </CardHeader>
@@ -153,15 +153,15 @@ export default function StatsPage() {
           </Card>
         </div>
 
-        <Card className="mt-8 border border-gray-600">
+        <Card className="mt-8 border border-border">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
-              <Clock className="w-5 h-5 text-gray-500 mt-0.5" />
+              <Clock className="w-5 h-5 text-muted-foreground mt-0.5" />
               <div>
-                <h3 className="font-semibold text-white mb-1">
+                <h3 className="font-semibold text-foreground mb-1">
                   How often is data updated?
                 </h3>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   Our scrapers run every 30 minutes to bring you the latest job opportunities
                   from top remote job boards including LinkedIn, Remotive, and WeWorkRemotely.
                 </p>
@@ -183,22 +183,22 @@ interface StatCardProps {
 
 function StatCard({ icon, label, value, color }: StatCardProps) {
   const colorClasses = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600",
-    purple: "bg-purple-50 text-purple-600",
-    orange: "bg-orange-50 text-orange-600",
+    blue: "bg-primary/10 text-primary",
+    green: "bg-secondary text-secondary-foreground",
+    purple: "bg-accent text-accent-foreground",
+    orange: "bg-muted text-muted-foreground",
   };
 
   return (
-    <Card className="border border-gray-600">
+    <Card className="border border-border">
       <CardContent className="pt-6">
         <div className="flex items-center gap-4">
           <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
             {icon}
           </div>
           <div>
-            <p className="text-sm text-gray-400 mb-1">{label}</p>
-            <p className="text-2xl font-bold text-white">{value}</p>
+            <p className="text-sm text-muted-foreground mb-1">{label}</p>
+            <p className="text-2xl font-bold text-foreground">{value}</p>
           </div>
         </div>
       </CardContent>
@@ -216,14 +216,14 @@ function SourceBar({ name, count, percentage }: BarProps) {
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
-        <span className="text-sm font-medium text-gray-700">{name}</span>
-        <span className="text-sm text-gray-600">
+        <span className="text-sm font-medium text-foreground">{name}</span>
+        <span className="text-sm text-muted-foreground">
           {count.toLocaleString()} ({percentage.toFixed(1)}%)
         </span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2.5">
+      <div className="w-full bg-muted rounded-full h-2.5">
         <div
-          className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+          className="bg-primary h-2.5 rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -235,14 +235,14 @@ function TypeBar({ type, count, percentage }: BarProps & { type: string }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
-        <span className="text-sm font-medium text-gray-700">{type}</span>
-        <span className="text-sm text-gray-600">
+        <span className="text-sm font-medium text-foreground">{type}</span>
+        <span className="text-sm text-muted-foreground">
           {count.toLocaleString()} ({percentage.toFixed(1)}%)
         </span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2.5">
+      <div className="w-full bg-muted rounded-full h-2.5">
         <div
-          className="bg-green-600 h-2.5 rounded-full transition-all duration-500"
+          className="bg-primary h-2.5 rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -252,8 +252,8 @@ function TypeBar({ type, count, percentage }: BarProps & { type: string }) {
 
 function StatsPageSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-background">
+      <div className="bg-popover border-b border-border">
         <div className="py-8">
           <div className="text-center">
             <Skeleton className="h-10 w-96 mx-auto mb-3" />
