@@ -27,6 +27,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 app.use(createRoutes(container));
+
 app.get('/', (req: Request, res: Response) => {
   res.json({
     name: 'Job Scraper API',
@@ -37,6 +38,8 @@ app.get('/', (req: Request, res: Response) => {
       stats: '/api/v1/stats',
       jobs: '/api/v1/jobs',
       search: '/api/v1/jobs/search',
+      savedJobs: '/api/v1/saved-jobs',
+      auth: '/api/v1/auth',
     },
   });
 });

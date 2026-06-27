@@ -1,4 +1,14 @@
-import { Bookmark, MapPin, DollarSign, Briefcase, Globe, ExternalLink, Building2, Clock } from 'lucide-react';
+import {
+  Bookmark,
+  MapPin,
+  DollarSign,
+  Briefcase,
+  Globe,
+  ExternalLink,
+  Building2,
+  Clock,
+  Loader2,
+} from 'lucide-react';
 import { Job } from '@/types';
 import { formatJobType, formatRelativeTime } from '@/lib/utils';
 import {
@@ -12,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
 
 type DescriptionBlock =
   | { type: 'heading'; text: string }
@@ -55,12 +64,21 @@ function getDescriptionBlocks(raw: string | null | undefined): DescriptionBlock[
 
 interface JobDetailModalProps {
   job: Job;
-  isSaved: boolean;
-  onSave: () => void;
+  isSaved?: boolean;
+  isSaveLoading?: boolean;
+  showSaveButton?: boolean;
+  onSave?: () => void;
   onClose: () => void;
 }
 
-export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModalProps) {
+export function JobDetailModal({
+  job,
+  isSaved = false,
+  isSaveLoading = false,
+  showSaveButton = true,
+  onSave,
+  onClose,
+}: JobDetailModalProps) {
   const descriptionBlocks = getDescriptionBlocks(job.description);
   const relativeTimeSource = job.postedAt || job.scrapedAt;
 
@@ -78,20 +96,34 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
                 <span className="font-medium">{job.company}</span>
               </DialogDescription>
             </div>
-            <Button
-              variant={isSaved ? "default" : "outline"}
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSave();
-              }}
-              className={isSaved
-                ? "bg-primary hover:bg-muted"
-                : "hover:bg-accent border-border"
-              }
-            >
-              <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
-            </Button>
+
+            {showSaveButton && (
+              <Button
+                variant={isSaved ? 'default' : 'outline'}
+                size="icon"
+                disabled={isSaveLoading}
+                aria-label={isSaved ? 'Unsave job' : 'Save job'}
+                title={isSaved ? 'Unsave job' : 'Save job'}
+                onClick={(e) => {
+                  e.stopPropagation();
+
+                  if (!isSaveLoading) {
+                    onSave?.();
+                  }
+                }}
+                className={
+                  isSaved
+                    ? 'bg-primary hover:bg-muted disabled:opacity-70'
+                    : 'hover:bg-accent border-border disabled:opacity-70'
+                }
+              >
+                {isSaveLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-current' : ''}`} />
+                )}
+              </Button>
+            )}
           </div>
         </DialogHeader>
 
@@ -136,7 +168,9 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
 
             {descriptionBlocks.length > 0 && (
               <div>
-                <h3 className="font-bold text-lg mb-3 text-muted-foreground">Job Description</h3>
+                <h3 className="font-bold text-lg mb-3 text-muted-foreground">
+                  Job Description
+                </h3>
                 <div className="space-y-4">
                   {descriptionBlocks.map((block, index) => (
                     block.type === 'heading' ? (
@@ -164,7 +198,7 @@ export function JobDetailModal({ job, isSaved, onSave, onClose }: JobDetailModal
         <div className="p-6 pt-2">
           <Button
             asChild
-            className="w-full bg-card hover:bg-primary text-foreground hover:text-background "
+            className="w-full bg-card hover:bg-primary text-foreground hover:text-background"
             size="lg"
           >
             <a

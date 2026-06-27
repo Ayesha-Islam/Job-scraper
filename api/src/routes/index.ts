@@ -1,5 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { Container } from '../container';
+import { db } from '../lib/prisma';
+import { requireAuth } from '../middleware/auth.middleware';
+import { SavedJobController } from '../controllers/saved-job.controller';
+import { SavedJobService } from '../services/saved-job.service';
 
 export function createRoutes(container: Container): Router {
   const router = Router();
@@ -12,6 +16,8 @@ export function createRoutes(container: Container): Router {
     adminController,
     authController,
   } = container;
+
+  const savedJobController = new SavedJobController(new SavedJobService(db));
 
   router.get('/health', healthController.check.bind(healthController));
   router.get('/health/db', healthController.checkDatabase.bind(healthController));
@@ -29,6 +35,12 @@ export function createRoutes(container: Container): Router {
         health: `${API_V1}/health`,
         jobs: `${API_V1}/jobs`,
         jobSearch: `${API_V1}/jobs/search`,
+        savedJobs: {
+          list: `GET ${API_V1}/saved-jobs`,
+          save: `POST ${API_V1}/saved-jobs`,
+          remove: `DELETE ${API_V1}/saved-jobs/:jobId`,
+          check: `GET ${API_V1}/saved-jobs/check/:jobId`,
+        },
         stats: `${API_V1}/stats`,
         auth: {
           register: `POST ${API_V1}/auth/register`,
@@ -49,11 +61,16 @@ export function createRoutes(container: Container): Router {
 
   router.post(`${API_V1}/auth/register`, authController.register.bind(authController));
   router.post(`${API_V1}/auth/login`, authController.login.bind(authController));
-  router.get(`${API_V1}/auth/me`, authController.me.bind(authController));
+  router.get(`${API_V1}/auth/me`, requireAuth, authController.me.bind(authController));
 
   router.get(`${API_V1}/jobs`, jobController.getJobs.bind(jobController));
   router.get(`${API_V1}/jobs/search`, jobController.searchJobs.bind(jobController));
   router.get(`${API_V1}/jobs/:id`, jobController.getJobById.bind(jobController));
+
+  router.post(`${API_V1}/saved-jobs`, requireAuth, savedJobController.saveJob.bind(savedJobController));
+  router.get(`${API_V1}/saved-jobs`, requireAuth, savedJobController.getSavedJobs.bind(savedJobController));
+  router.get(`${API_V1}/saved-jobs/check/:jobId`, requireAuth, savedJobController.isJobSaved.bind(savedJobController));
+  router.delete(`${API_V1}/saved-jobs/:jobId`, requireAuth, savedJobController.removeSavedJob.bind(savedJobController));
 
   router.get(`${API_V1}/stats`, statsController.getStats.bind(statsController));
   router.get(`${API_V1}/stats/sources`, statsController.getStats.bind(statsController));

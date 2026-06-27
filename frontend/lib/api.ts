@@ -1,9 +1,22 @@
-import { Job, ApiResponse, PaginatedResponse, Stats } from "@/types";
+import { Job, ApiResponse, PaginatedResponse, Stats } from '@/types';
 
 const API_URL =
   typeof window === 'undefined'
     ? process.env.INTERNAL_API_URL ?? 'http://api:3001/api/v1'
     : process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
+
+type LoginResponse = ApiResponse<{ id: string; email: string; name: string }> & {
+  token: string;
+};
+
+type SavedJobWithJob = {
+  id: number;
+  userId: number;
+  jobId: string;
+  savedAt: string;
+  job: Job;
+};
+
 async function fetchAPI<T>(
   endpoint: string,
   options?: RequestInit
@@ -12,6 +25,7 @@ async function fetchAPI<T>(
   const url = `${API_URL}/${cleanEndpoint}`;
 
   console.log('🌐 Fetching:', url);
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -36,6 +50,12 @@ async function fetchAPI<T>(
   }
 }
 
+function authHeaders(token?: string): HeadersInit {
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export async function registerUser(
   email: string,
   password: string,
@@ -50,10 +70,18 @@ export async function registerUser(
 export async function loginUser(
   email: string,
   password: string
-): Promise<ApiResponse<{ id: string; email: string; name: string }>> {
+): Promise<LoginResponse> {
   return fetchAPI('auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function getCurrentUser(
+  token: string
+): Promise<ApiResponse<{ id: string; email: string; name: string }>> {
+  return fetchAPI('auth/me', {
+    headers: authHeaders(token),
   });
 }
 
@@ -96,40 +124,60 @@ export async function triggerScrape(): Promise<ApiResponse<{ message: string }>>
 
 export async function saveJob(
   jobId: string,
-  userId: string
-): Promise<ApiResponse<{ message: string }>> {
+  token: string
+): Promise<ApiResponse<SavedJobWithJob>> {
   return fetchAPI('saved-jobs', {
     method: 'POST',
-    body: JSON.stringify({ jobId, userId }),
+    headers: authHeaders(token),
+    body: JSON.stringify({ jobId }),
   });
 }
 
 export async function getSavedJobs(
-  userId: string
+  token: string
 ): Promise<ApiResponse<Job[]>> {
-  return fetchAPI(`saved-jobs/${userId}`);
+  const response = await fetchAPI<ApiResponse<SavedJobWithJob[]>>('saved-jobs', {
+    headers: authHeaders(token),
+  });
+
+  return {
+    ...response,
+    data: response.data.map(savedJob => savedJob.job),
+  };
+}
+
+export async function getRawSavedJobs(
+  token: string
+): Promise<ApiResponse<SavedJobWithJob[]>> {
+  return fetchAPI('saved-jobs', {
+    headers: authHeaders(token),
+  });
 }
 
 export async function unsaveJob(
   jobId: string,
-  userId: string
-): Promise<ApiResponse<{ message: string }>> {
+  token: string
+): Promise<ApiResponse<{ removed: boolean }>> {
   return fetchAPI(`saved-jobs/${jobId}`, {
     method: 'DELETE',
-    body: JSON.stringify({ userId }),
+    headers: authHeaders(token),
   });
 }
 
 export async function isJobSaved(
   jobId: string,
-  userId: string
+  token: string
 ): Promise<boolean> {
   try {
     const response = await fetchAPI<ApiResponse<{ saved: boolean }>>(
-      `saved-jobs/check/${jobId}/${userId}`
+      `saved-jobs/check/${jobId}`,
+      {
+        headers: authHeaders(token),
+      }
     );
+
     return response.data.saved;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

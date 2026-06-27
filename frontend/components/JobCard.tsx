@@ -1,10 +1,9 @@
-import { Bookmark, MapPin, Briefcase, DollarSign, Clock, Building2 } from 'lucide-react';
+import { Bookmark, MapPin, Briefcase, DollarSign, Clock, Building2, Loader2 } from 'lucide-react';
 import { Job } from '@/types';
 import { formatJobType, formatRelativeTime } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-
 
 function stripStaleHtml(raw: string | null | undefined): string {
   if (!raw) return '';
@@ -28,18 +27,32 @@ function stripStaleHtml(raw: string | null | undefined): string {
 }
 
 function getDescriptionPreview(raw: string | null | undefined): string {
-  return stripStaleHtml(raw).replace(/^##\s+/gm, '').replace(/\n+/g, ' ').replace(/ +/g, ' ').trim();
+  return stripStaleHtml(raw)
+    .replace(/^##\s+/gm, '')
+    .replace(/\n+/g, ' ')
+    .replace(/ +/g, ' ')
+    .trim();
 }
 
 interface JobCardProps {
   job: Job;
-  isSaved: boolean;
-  onSave: () => void;
+  isSaved?: boolean;
+  isSaveLoading?: boolean;
+  showSaveButton?: boolean;
+  onSave?: () => void;
   onClick: () => void;
   compact?: boolean;
 }
 
-export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobCardProps) {
+export function JobCard({
+  job,
+  isSaved = false,
+  isSaveLoading = false,
+  showSaveButton = true,
+  onSave,
+  onClick,
+  compact = false,
+}: JobCardProps) {
   const descriptionPreview = getDescriptionPreview(job.description);
   const relativeTimeSource = job.postedAt || job.scrapedAt;
 
@@ -49,25 +62,40 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
       className={`relative bg-card border-none hover:shadow-2xl hover:scale-[1.02] hover:border-border transition-all duration-300 cursor-pointer group flex flex-col ${compact ? 'h-full' : ''
         }`}
     >
-      <Button
-        onClick={(e) => {
-          e.stopPropagation();
-          onSave();
-        }}
-        variant="ghost"
-        size="icon"
-        className="absolute top-4 right-4 z-10 hover:bg-popover/10 rounded-full"
-      >
-        <Bookmark
-          className={`w-5 h-5 transition-all ${isSaved ? 'fill-primary stroke-primary' : 'stroke-primary hover:fill-primary/50'
-            }`}
-        />
-      </Button>
+      {showSaveButton && (
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isSaveLoading) {
+              onSave?.();
+            }
+          }}
+          variant="ghost"
+          size="icon"
+          disabled={isSaveLoading}
+          aria-label={isSaved ? 'Unsave job' : 'Save job'}
+          title={isSaved ? 'Unsave job' : 'Save job'}
+          className="absolute top-4 right-4 z-10 hover:bg-popover/10 rounded-full disabled:opacity-70"
+        >
+          {isSaveLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+          ) : (
+            <Bookmark
+              className={`w-5 h-5 transition-all ${isSaved
+                  ? 'fill-primary stroke-primary'
+                  : 'stroke-primary hover:fill-primary/50'
+                }`}
+            />
+          )}
+        </Button>
+      )}
 
       <CardHeader className="pb-3">
         {!compact && (
-          <div className="pr-12">
-            <h3 className="font-bold text-lg text-foreground leading-tight mb-1">{job.position}</h3>
+          <div className={showSaveButton ? 'pr-12' : ''}>
+            <h3 className="font-bold text-lg text-foreground leading-tight mb-1">
+              {job.position}
+            </h3>
             <div className="flex items-center gap-1 text-xs text-foreground">
               <Building2 className="w-4 h-4" />
               <p>{job.company}</p>
@@ -76,8 +104,10 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
         )}
 
         {compact && (
-          <div className="pr-12">
-            <h3 className="font-bold text-sm mb-1 line-clamp-2 text-foreground">{job.position}</h3>
+          <div className={showSaveButton ? 'pr-12' : ''}>
+            <h3 className="font-bold text-sm mb-1 line-clamp-2 text-foreground">
+              {job.position}
+            </h3>
             <p className="text-xs text-foreground flex items-center gap-1">
               <Building2 className="w-3 h-3 text-foreground" />
               {job.company}
@@ -89,7 +119,6 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
       {!compact && (
         <>
           <CardContent className="space-y-3">
-            {/* Job Details Badges */}
             <div className="flex flex-wrap gap-2">
               {job.location && (
                 <Badge variant="outline" className="bg-popover border-border">
@@ -133,12 +162,13 @@ export function JobCard({ job, isSaved, onSave, onClick, compact = false }: JobC
             )}
           </CardContent>
 
-          <CardFooter className=" pb-4 mt-auto">
+          <CardFooter className="pb-4 mt-auto">
             <Button
               onClick={(e) => {
                 e.stopPropagation();
+
                 if (job.url) {
-                  window.open(job.url, '_blank');
+                  window.open(job.url, '_blank', 'noopener,noreferrer');
                 }
               }}
               className="w-full bg-background text-foreground hover:bg-popover hover:text-primary-foreground transition-colors"

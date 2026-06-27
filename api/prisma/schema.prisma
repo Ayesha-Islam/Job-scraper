@@ -27,6 +27,8 @@ model Job {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  savedBy SavedJob[]
+
   @@unique([companyKey, positionKey, locationKey])
   @@index([source])
   @@index([createdAt])
@@ -59,7 +61,23 @@ model User {
   createdAt  DateTime @default(now()) @map("created_at")
   updated_at DateTime @updatedAt @map("updated_at")
 
+  savedJobs SavedJob[]
+
   @@map("users")
+}
+
+model SavedJob {
+  id      Int      @id @default(autoincrement())
+  userId  Int
+  jobId   String
+  savedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([jobId])
 }
 
 enum JobType {
