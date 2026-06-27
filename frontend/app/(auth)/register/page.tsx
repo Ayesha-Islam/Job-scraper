@@ -30,6 +30,19 @@ export default function RegisterPage() {
         e.preventDefault();
         setError(null);
 
+        const fullName = formData.name.trim();
+        const email = formData.email.trim().toLowerCase();
+
+        if (fullName.split(/\s+/).length < 2) {
+            setError("Please enter your full name, for example Joe Allen.");
+            return;
+        }
+
+        if (formData.password.length < 8) {
+            setError("Password must be at least 8 characters long.");
+            return;
+        }
+
         if (formData.password !== formData.confirmPassword) {
             setError("Passwords do not match");
             return;
@@ -39,14 +52,14 @@ export default function RegisterPage() {
 
         try {
             const result = await registerUser(
-                formData.email,
+                email,
                 formData.password,
-                formData.name
+                fullName
             );
 
             if (result.success) {
                 const loginRes = await signIn("credentials", {
-                    email: formData.email,
+                    email,
                     password: formData.password,
                     redirect: false,
                 });
@@ -64,7 +77,6 @@ export default function RegisterPage() {
             setIsLoading(false);
         }
     };
-
     return (
         <div className="min-h-screen flex items-center justify-center bg-background pt-12 text-foreground">
             <Card className="w-full max-w-md">

@@ -2,7 +2,7 @@ import { Job, ApiResponse, PaginatedResponse, Stats } from "@/types";
 
 const API_URL =
   typeof window === 'undefined'
-    ? process.env.INTERNAL_API_URL ?? 'http://backend:3001/api/v1'
+    ? process.env.INTERNAL_API_URL ?? 'http://api:3001/api/v1'
     : process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 async function fetchAPI<T>(
   endpoint: string,

@@ -19,19 +19,17 @@ export default function LoginPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
-        setIsLoading(true)
-
+        setIsLoading(true);
 
         try {
             const result = await signIn("credentials", {
-                email,
+                email: email.trim().toLowerCase(),
                 password,
                 redirect: false,
             });
 
             if (result?.error) {
                 setError("Invalid email or password");
-
             } else {
                 router.push("/jobs");
                 router.refresh();
@@ -41,7 +39,7 @@ export default function LoginPage() {
         } finally {
             setIsLoading(false);
         }
-    }
+    };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background px-4">

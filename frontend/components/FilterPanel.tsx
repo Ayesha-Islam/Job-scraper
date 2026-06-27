@@ -12,9 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, Briefcase, MapPin, DollarSign, BarChart2, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, Briefcase, DollarSign, BarChart2, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface FilterOptions {

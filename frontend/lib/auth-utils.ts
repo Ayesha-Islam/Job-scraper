@@ -29,6 +29,6 @@ export async function logout() {
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('userId');
     }
-    
+
     await signOut({ redirect: false, callbackUrl: '/' });
 }
