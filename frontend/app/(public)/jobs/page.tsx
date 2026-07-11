@@ -23,6 +23,9 @@ function JobsPageContent() {
   const { data: session, status } = useSession();
 
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [initialTotalJobs, setInitialTotalJobs] = useState(0);
+  const [initialTotalPages, setInitialTotalPages] = useState(1);
+  const [initialPage, setInitialPage] = useState(1);
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,12 +46,15 @@ function JobsPageContent() {
 
         const response = await getJobs({
           page: 1,
-          limit: 100,
+          limit: 50,
           search: initialSearch || undefined,
         });
 
         if (response.success && response.data) {
           setJobs(response.data.data);
+          setInitialTotalJobs(response.data.pagination.total);
+          setInitialTotalPages(response.data.pagination.totalPages);
+          setInitialPage(response.data.pagination.page);
         } else {
           setError('Failed to load jobs.');
         }
@@ -152,6 +158,9 @@ function JobsPageContent() {
   return (
     <BrowseJobs
       jobs={jobs}
+      initialTotalJobs={initialTotalJobs}
+      initialTotalPages={initialTotalPages}
+      initialPage={initialPage}
       onSaveJob={handleSaveJob}
       savedJobs={savedJobs}
       onNavigateToSaved={() => router.push('/saved-jobs')}

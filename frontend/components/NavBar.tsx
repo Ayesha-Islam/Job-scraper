@@ -114,6 +114,20 @@ export default function Navbar({
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>
+
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <Link
+                    href="/documentation"
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      "bg-transparent text-foreground hover:bg-popover/10 hover:text-foreground focus:bg-popover/10 focus:text-foreground"
+                    )}
+                  >
+                    Documentation
+                  </Link>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
             </NavigationMenuList>
           </NavigationMenu>
         </div>
@@ -142,10 +156,10 @@ export default function Navbar({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="h-10 w-10 rounded-full ring-2 ring-border hover:ring-ring transition-all duration-200 focus:outline-none">
+                <button className="h-10 w-10 rounded-full ring-2 ring-border hover:ring-primary transition-all duration-200 focus:outline-none">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={session.user?.image || ""} />
-                    <AvatarFallback className="bg-card text-foreground text-sm font-bold">
+                    <AvatarFallback className="bg-muted text-foreground text-sm font-bold">
                       {userInitial}
                     </AvatarFallback>
                   </Avatar>
@@ -155,21 +169,21 @@ export default function Navbar({
               <DropdownMenuContent
                 align="end"
                 sideOffset={10}
-                className="w-60 p-0 overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl"
+                className="w-60 p-0 overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
               >
                 {/* user header */}
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
                   <Avatar className="h-9 w-9 flex-shrink-0">
                     <AvatarImage src={session.user?.image || ""} />
-                    <AvatarFallback className="bg-card text-foreground text-sm font-bold">
+                    <AvatarFallback className="bg-muted text-foreground text-sm font-bold">
                       {userInitial}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-primary-foreground truncate">
+                    <p className="text-sm font-semibold text-foreground truncate">
                       {session.user?.name}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    <p className="text-xs text-muted-foreground truncate">
                       {session.user?.email}
                     </p>
                   </div>
@@ -179,7 +193,7 @@ export default function Navbar({
                   <DropdownMenuItem asChild>
                     <Link
                       href="/profile"
-                      className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-primary-foreground rounded-lg cursor-pointer hover:bg-accent hover:text-primary-foreground focus:bg-muted focus:text-primary-foreground transition-colors"
+                      className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-foreground rounded-lg cursor-pointer hover:bg-accent hover:text-foreground focus:bg-muted focus:text-primary-foreground transition-colors"
                     >
                       <User className="h-4 w-4 text-muted-foreground" />
                       Profile
@@ -188,7 +202,7 @@ export default function Navbar({
                   <DropdownMenuItem asChild>
                     <Link
                       href="/saved-jobs"
-                      className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-primary-foreground rounded-lg cursor-pointer hover:bg-accent hover:text-primary-foreground focus:bg-muted focus:text-primary-foreground transition-colors"
+                      className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-foreground rounded-lg cursor-pointer hover:bg-accent hover:text-foreground focus:bg-muted focus:text-primary-foreground transition-colors"
                     >
                       <Bookmark className="h-4 w-4 text-muted-foreground" />
                       Saved Jobs
@@ -197,14 +211,14 @@ export default function Navbar({
                   <DropdownMenuItem asChild>
                     <Link
                       href="/profile"
-                      className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-primary-foreground rounded-lg cursor-pointer hover:bg-accent hover:text-primary-foreground focus:bg-muted focus:text-primary-foreground transition-colors"
+                      className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-foreground rounded-lg cursor-pointer hover:bg-accent hover:text-foreground focus:bg-muted focus:text-primary-foreground transition-colors"
                     >
                       <Settings className="h-4 w-4 text-muted-foreground" />
                       Settings
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
-                <div className="mx-3 my-1.5 h-px bg-popover/[0.07]" />
+                <div className="mx-3 my-1.5 h-px bg-border" />
                 <DropdownMenuItem
                   onClick={handleSignOut}
                   className="flex items-center gap-2.5 mx-1 px-3 py-2 text-sm text-destructive rounded-lg cursor-pointer hover:bg-destructive/10 hover:text-destructive focus:bg-red-500/10 focus:text-destructive transition-colors"
@@ -220,7 +234,7 @@ export default function Navbar({
               <Link href="/login">
                 <Button
                   variant="ghost"
-                  className="px-5 py-1.5 text-foreground rounded-full text-sm border border-border hover:bg-popover/10 hover:text-foreground"
+                  className="px-5 py-1.5 text-foreground rounded-full text-sm border border-border hover:bg-accent hover:text-foreground"
                 >
                   Login
                 </Button>

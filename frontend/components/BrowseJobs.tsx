@@ -16,6 +16,9 @@ import { Separator } from '@/components/ui/separator';
 
 interface BrowseJobsProps {
   jobs: Job[];
+  initialTotalJobs?: number;
+  initialTotalPages?: number;
+  initialPage?: number;
   onSaveJob: (jobId: string) => void;
   savedJobs: Set<string>;
   onNavigateToSaved: () => void;
@@ -27,6 +30,9 @@ interface BrowseJobsProps {
 
 export function BrowseJobs({
   jobs: initialJobs,
+  initialTotalJobs,
+  initialTotalPages,
+  initialPage,
   onSaveJob,
   savedJobs,
   initialSearch = '',
@@ -45,17 +51,26 @@ export function BrowseJobs({
   });
   const [jobs, setJobs] = useState<Job[]>(initialJobs);
   const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalJobs, setTotalJobs] = useState(0);
+  const [currentPage, setCurrentPage] = useState(initialPage || 1);
+  const [totalPages, setTotalPages] = useState(
+    initialTotalPages ?? Math.max(1, Math.ceil((initialJobs?.length || 0) / 50))
+  );
+  const [totalJobs, setTotalJobs] = useState(
+    initialTotalJobs ?? (initialJobs?.length || 0)
+  );
 
   useEffect(() => {
     if (initialJobs && initialJobs.length > 0) {
       setJobs(initialJobs);
+
+      const limit = 50;
+      setTotalJobs(initialTotalJobs ?? initialJobs.length);
+      setCurrentPage(initialPage ?? 1);
+      setTotalPages(initialTotalPages ?? Math.max(1, Math.ceil(initialJobs.length / limit)));
     } else {
       fetchFilteredJobs(1);
     }
-  }, [initialJobs]);
+  }, [initialJobs, initialTotalJobs, initialPage, initialTotalPages]);
 
   const fetchFilteredJobs = async (page: number = 1) => {
     try {
@@ -198,24 +213,6 @@ export function BrowseJobs({
                     )}
                   </Button>
                 </div>
-                {/* <div className="flex gap-2">
-                  <Button
-                    variant={viewMode === 'grid' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('grid')}
-                    className={`h-11 w-11  ${viewMode === 'grid' ? 'bg-background text-foreground  hover:bg-primary' : 'hover:bg-accent '}`}
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === 'masonry' ? 'default' : 'outline'}
-                    size="icon"
-                    onClick={() => setViewMode('masonry')}
-                    className={`h-11 w-11 ${viewMode === 'masonry' ? 'bg-background  text-foreground hover:bg-primary' : 'hover:bg-accent'}`}
-                  >
-                    <Grid3x3 className="h-4 w-4" />
-                  </Button>
-                </div> */}
               </div>
             </CardContent>
           </Card>
@@ -371,7 +368,7 @@ export function BrowseJobs({
                             size="icon"
                             onClick={() => handlePageChange(pageNum)}
                             className={`w-10 h-10 ${currentPage === pageNum
-                              ? 'bg-primary text-foreground hover:bg-primary'
+                              ? 'bg-primary text-background hover:bg-primary hover:text-background'
                               : 'hover:bg-accent'
                               }`}
                           >
@@ -392,7 +389,7 @@ export function BrowseJobs({
                     </Button>
                   </div>
 
-                  <p className="text-center text-foreground  text-sm mt-4">
+                  <p className="text-center text-foreground text-sm mt-4">
                     Page {currentPage} of {totalPages}
                   </p>
                 </div>

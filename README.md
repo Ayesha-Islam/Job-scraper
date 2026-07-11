@@ -1,184 +1,139 @@
 # Job Scraper
 
-## Overview
+## What is Job Scraper?
 
-Job Scraper is a full-stack web application for scraping, aggregating, and browsing job listings from multiple sources. It features a robust backend API built with Node.js, Express, Prisma, and PostgreSQL, and a modern frontend built with Next.js and Tailwind CSS. The platform supports user authentication, job search, filtering, saving jobs, and statistics.
-
----
+Job Scraper is a full-stack app for collecting, searching, and browsing job listings from multiple providers. It pairs an Express API with a Next.js frontend and uses PostgreSQL, Redis, and browser scraping to keep listings live and searchable.
 
 ## Features
 
-- **Automated Job Scraping:** Scrapes jobs from various sources using Puppeteer and Cheerio.
-- **RESTful API:** Provides endpoints for jobs, search, statistics, authentication, and health checks.
-- **User Authentication:** Secure registration and login with JWT and bcrypt.
-- **Job Search & Filtering:** Search by keyword, company, location, type, and source.
-- **Save Jobs:** Users can save/unsave jobs to their profile.
-- **Statistics:** View stats like total jobs and jobs added today.
-- **Responsive Frontend:** Next.js app with modern UI, filtering, pagination, and job details modal.
-- **Caching:** Uses Redis for caching job data and improving performance.
-- **Admin Controls:** (If implemented) Admin endpoints for managing jobs and users.
+- Automated scraping from external job sources
+- Search and filter jobs by keyword, location, source, and type
+- User registration, login, and saved jobs
+- Admin controls for scraping and cache management
+- Redis caching for faster query responses
+- Health checks for API, database, and Redis
 
----
+## Tech Stack
 
-## Architecture
+- Backend: Node.js, Express, Prisma, PostgreSQL, Redis
+- Scraping: Puppeteer, Cheerio
+- Frontend: Next.js, React, TypeScript, Tailwind CSS
+- Auth: JWT, bcryptjs, NextAuth
+- Dev tools: Docker, Vitest, Prisma
 
-```
-├── api/         # Backend API (Node.js, Express, Prisma)
-│   ├── src/
-│   │   ├── controllers/   # Route controllers (auth, job, stats, etc.)
-│   │   ├── services/      # Business logic (job scraping, stats, etc.)
-│   │   ├── lib/           # Prisma client, helpers
-│   │   ├── routes/        # API route definitions
-│   │   ├── types.ts       # TypeScript types/interfaces
-│   │   ├── app.ts         # Express app setup
-│   │   ├── scrape.ts      # Scraper logic (Puppeteer, Cheerio)
-│   │   └── ...
-│   ├── prisma/
-│   │   ├── schema.prisma  # Database schema
-│   │   └── migrations/    # Prisma migrations
-│   ├── package.json       # Backend dependencies/scripts
-│   └── ...
-├── frontend/    # Frontend (Next.js, React, Tailwind)
-│   ├── app/     # Next.js app directory
-│   ├── components/        # UI components (JobCard, BrowseJobs, etc.)
-│   ├── lib/               # API helpers, auth utils
-│   ├── types/             # Shared TypeScript types
-│   ├── public/            # Static assets
-│   ├── package.json       # Frontend dependencies/scripts
-│   └── ...
-└── README.md   # Project documentation
-```
+## Repository Layout
 
----
+- `api/` — backend service, routes, scraping, and database schema
+- `frontend/` — Next.js UI, auth, and API integration
+- `docs/` — detailed architecture, environment, and API references
+- `docker-compose.yml` — local Docker development stack
+- `DOCKER_SETUP.md` — Docker usage and troubleshooting
 
-## Backend (API)
+## Quick Start
 
-- **Framework:** Node.js, Express
-- **Database:** PostgreSQL (via Prisma ORM)
-- **Caching:** Redis (via ioredis)
-- **Scraping:** Puppeteer, Cheerio
-- **Authentication:** JWT, bcryptjs
-- **API Endpoints:**
-	- `/api/v1/jobs` - List, filter, and search jobs
-	- `/api/v1/jobs/search` - Advanced search
-	- `/api/v1/jobs/:id` - Get job details
-	- `/api/v1/stats` - Get job statistics
-	- `/api/v1/auth/register` - Register user
-	- `/api/v1/auth/login` - Login user
-	- `/api/v1/health` - Health check
+### Clone the repository
 
-### Database Schema (Prisma)
-
-- **Job**: id, company, position, location, salary, type, url, source, description, hash, postedAt, isActive, scrapedAt, createdAt, updatedAt
-- **User**: id, email, password, name, created_at, updated_at
-
-### Scraping Logic
-
-- Uses Puppeteer to automate browser and Cheerio to parse HTML.
-- Extracts job data, normalizes, and stores in PostgreSQL.
-- Deduplication via hash and unique constraints.
-- Supports job types: FULL_TIME, PART_TIME, CONTRACT, INTERNSHIP.
-
-### Business Logic
-
-- **JobService:** Handles job fetching, filtering, pagination, and stats.
-- **AuthController:** Handles registration, login, password hashing, JWT issuance.
-- **StatsController:** Aggregates job statistics.
-- **CacheService:** Caches job data for performance.
-
----
-
-## Frontend (Next.js)
-
-- **Framework:** Next.js (App Router), React, TypeScript
-- **UI:** Tailwind CSS, shadcn/ui, Lucide icons
-- **Pages:**
-	- `/` - Landing page
-	- `/jobs` - Browse/search jobs
-	- `/jobs/[id]` - Job details modal
-	- `/saved-jobs` - Saved jobs
-	- `/profile` - User profile
-	- `/stats` - Statistics
-	- `/auth/login` - Login
-	- `/auth/register` - Register
-### Main Components
-
-- **Landing:** Hero section, search bar, get started
-- **JobCard:** Displays job summary
-- **JobDetailModal:** Shows full job details
-- **SavedJobs:** List of saved jobs
-- **FilterPanel:** Filtering by type, location, company, etc.
-- **NavBar, Footer, Pagination, ProtectedRoutes, etc.**
-
-### 1. Clone the repository
+```bash
 git clone https://github.com/Ayesha-Islam/Job-scraper.git
+cd Job-scraper
 ```
 
-### 2. Backend Setup
+### Start the backend
+
+```bash
 cd api
-cp .env.example .env   # Set DB, JWT, REDIS config
 npm install
+npm run prisma:generate
 npm run prisma:migrate
 npm run dev
 ```
-### 3. Frontend Setup
-```sh
-cp .env.example .env   # Set NEXTAUTH_URL, API URL, etc.
+
+Backend default: `http://localhost:3001`
+
+### Start the frontend
+
+```bash
+cd ../frontend
 npm install
 npm run dev
 ```
 
----
+Frontend default: `http://localhost:3000`
 
-## Usage
+## Docker
 
-1. Start backend API (`api/`): `npm run dev`
-2. Start frontend (`frontend/`): `npm run dev`
-3. Access the app at [http://localhost:3000](http://localhost:3000)
-4. Register/login, browse jobs, search/filter, save jobs, view stats.
+Start the full stack:
 
----
+```bash
+docker compose up --build
+```
 
-## API Reference (Sample)
+Stop services:
 
-### `GET /api/v1/jobs`
+```bash
+docker compose down
+```
 
-### `GET /api/v1/stats`
+Remove local database/cache data:
 
----
+```bash
+docker compose down -v
+```
 
-## Business Logic Details
+## Environment Configuration
 
-- **Job Scraping:**
-	- Scraper runs on demand or schedule, fetches jobs from sources, parses, deduplicates, and stores.
-	- Hashing and unique constraints prevent duplicates.
-	- Scraping logic is modular for easy source extension.
-- **Job Filtering & Search:**
-	- Multi-criteria filtering (search, company, location, type, source, sort).
-	- Pagination and sorting (recent, oldest, salary).
-- **User Auth:**
-	- Registration and login with validation, password hashing, JWT issuance.
-	- User data stored securely in PostgreSQL.
-- **Caching:**
-	- Redis used to cache job queries and stats for performance.
+The README keeps environment settings brief. Full variables are documented in `docs/reference/environment-variables.md`.
 
----
+Backend environment file: `api/.env`
+Frontend environment file: `frontend/.env.local`
 
-## Technologies Used
+Key variables:
+- `DATABASE_URL` — PostgreSQL connection string
+- `REDIS_URL` / `REDIS_HOST` + `REDIS_PORT` — Redis config
+- `JWT_SECRET` — backend auth signing secret
+- `NEXTAUTH_SECRET` / `AUTH_SECRET` — frontend auth secrets
+- `NEXTAUTH_URL` — frontend public URL
+- `NEXT_PUBLIC_API_URL` / `INTERNAL_API_URL` — API base URLs
 
-- **Backend:** Node.js, Express, Prisma, PostgreSQL, Redis, Puppeteer, Cheerio
-- **Frontend:** Next.js, React, Tailwind CSS, shadcn/ui, Lucide
-- **Auth:** JWT, bcryptjs, next-auth
-- **Other:** TypeScript, Docker (optional), ESLint, Prettier
+## API Overview
 
----
+Base path: `/api/v1`
+
+- `GET /jobs` — list and filter jobs
+- `GET /jobs/search` — advanced search
+- `GET /jobs/:id` — job details
+- `GET /stats` — application statistics
+- `POST /auth/register` — register user
+- `POST /auth/login` — login
+- `GET /auth/me` — current user info
+- `POST /admin/scrape` — trigger scraping
+- `DELETE /admin/cache` — clear cache
+
+For a complete API reference, see `docs/reference/api.md`.
+
+## Architecture Summary
+
+- `api/src/app.ts` — Express app and middleware setup
+- `api/src/routes/index.ts` — API route definitions
+- `api/src/controllers/` — controllers for auth, jobs, stats, admin flows
+- `api/src/services/` — scraped data processing, caching, and business rules
+- `api/prisma/schema.prisma` — database models for jobs and users
+- `frontend/app/` — Next.js pages and route handlers
+- `frontend/components/` — visual UI components
+- `frontend/lib/` — API client and auth utilities
+
+For design rationale, see `docs/architecture/overview.md`.
+
+## Run the App
+
+1. Start backend: `npm run dev` (from `api/`)
+2. Start frontend: `npm run dev` (from `frontend/`)
+3. Open `http://localhost:3000`
 
 ## Contributing
 
-Contributions are welcome! Please open issues or pull requests for improvements, bug fixes, or new features.
-
----
+Contributions are welcome. Open issues or pull requests for bug fixes, improvements, or documentation updates.
 
 ## License
 
-This project is licensed under the ISC License.
+Licensed under the ISC License.
