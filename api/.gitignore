@@ -1,8 +1,5 @@
 api/node_modules/
 api/dist/
-api/package-lock.json
-api/package.json
-api/tsconfig.json
 api/.env
 api/.env.local
 api/.env.development.local

@@ -72,10 +72,6 @@ temp/
 # API folder exclusions
 api/node_modules/
 api/dist/
-api/package-lock.json
-api/package.json
-api/tsconfig.json
-api/prisma.config.ts
 api/.env
 api/.env.*
 
@@ -100,9 +96,6 @@ api/prisma/*.db-journal
 #Frontend folder 
 Frontend/build/
 Frontend/node_modules/
-Frontend/package-lock.json
-Frontend/package.json
-Frontend/tsconfig.json
 Frontend/.env
 Frontend/.env.*
 Frontend/.env.local
