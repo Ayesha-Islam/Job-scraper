@@ -1,11 +1,28 @@
-api/node_modules/
-api/dist/
-api/.env
-api/.env.local
-api/.env.development.local
-api/.env.test.local
-api/.env.production.local
-api/.npm
-# Prisma database and migrations
-api/prisma/*.db
-api/prisma/*.db-journal
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# Generated Prisma client and local databases
+src/generated/prisma/
+prisma/generated/
+prisma/*.db
+prisma/*.db-journal
+
+# Logs and editor files
+*.log
+.npm/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

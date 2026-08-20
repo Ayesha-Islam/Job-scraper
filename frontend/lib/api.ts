@@ -116,9 +116,22 @@ export async function getStats(): Promise<ApiResponse<Stats>> {
   return fetchAPI('stats');
 }
 
-export async function triggerScrape(): Promise<ApiResponse<{ message: string }>> {
+export async function triggerScrape(
+  token: string,
+  source?: string
+): Promise<ApiResponse<{
+  results: unknown[];
+  summary: {
+    totalFound: number;
+    totalAdded: number;
+    totalDuplicates: number;
+    failed: number;
+  };
+}>> {
   return fetchAPI('admin/scrape', {
     method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(source ? { source } : {}),
   });
 }
 

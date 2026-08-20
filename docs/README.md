@@ -1,252 +1,61 @@
-# JobScraper
-
-> A production-oriented job aggregation platform that collects remote software engineering jobs from multiple providers, enriches their content, removes duplicates using semantic matching, and exposes a unified search interface through a modern web application.
-
----
-
-## Overview
-
-JobScraper is a full-stack application designed to aggregate remote job listings from multiple public job providers into a single searchable platform.
-
-Unlike simple web scrapers that mirror provider content, JobScraper performs multiple processing stages before a job becomes available to users. Every listing passes through a validation pipeline that normalizes provider-specific data, filters unsupported jobs, performs semantic deduplication, enriches incomplete descriptions, and stores only high-quality results.
-
-The project was built as a portfolio application to demonstrate production-oriented backend engineering practices including scraper architecture, data processing pipelines, search optimization, caching strategies, testing, and containerized deployment.
-
----
-
-## Features
-
-* Aggregate remote software engineering jobs from multiple providers
-* Provider-independent scraping architecture
-* Semantic job deduplication across providers
-* Provider-specific description enrichment
-* Advanced filtering and search
-* Pagination and sorting
-* User authentication
-* Save jobs for later
-* Redis caching
-* PostgreSQL persistence
-* Docker-based development environment
-* Health monitoring and provider metrics
-* Comprehensive unit testing
+# JobScraper Documentation
 
----
+JobScraper is a full-stack remote-job aggregator built around a data-quality problem: different job boards describe the same vacancy in incompatible and sometimes unreliable ways.
 
-## Supported Job Providers
+The documentation is organized by reader need. Start with the case study for the project story, use architecture pages to understand the system, follow guides to complete tasks, and use reference pages for exact contracts.
 
-JobScraper currently aggregates listings from multiple remote job boards.
+## Start here
 
-| Provider          | Status    |
-| ----------------- | --------- |
-| LinkedIn          | Supported |
-| RemoteOK          | Supported |
-| We Work Remotely  | Supported |
-| SkipTheDrive      | Supported |
-| RemoteHub         | Supported |
-| Hubstaff Talent   | Supported |
-| Remotive          | Supported |
-| Y Combinator Jobs | Supported |
-| NoDesk            | Supported |
+- [Project case study](case-study.md) — the problem, decisions, outcomes, and limitations.
+- [Architecture overview](architecture/overview.md) — system boundaries and request/data flows.
+- [Local development](guides/local-development.md) — run the project locally or with Docker.
+- [REST API reference](reference/api.md) — exact backend routes and response envelopes.
+- [Verification evidence](evidence/verification.md) — tests, commits, sanitized scrape data, and benchmark scope.
 
-Each provider implements the same scraper contract while maintaining provider-specific extraction and enrichment logic where necessary.
+## Architecture
 
----
+- [Architecture overview](architecture/overview.md)
+- [Ingestion and data quality](architecture/ingestion-and-data-quality.md)
+- [Search and caching](architecture/search-and-caching.md)
+- [Authentication](architecture/authentication.md)
 
-## High-Level Architecture
+## Decisions
 
-```text
-                    Scheduler
-                        │
-                        ▼
-              Provider Scrapers
-                        │
-                        ▼
-              Data Normalization
-                        │
-                        ▼
-                Job Processor
-                        │
-        ┌───────────────┼────────────────┐
-        ▼               ▼                ▼
-   Validation     Semantic Dedup     Enrichment
-        │               │                │
-        └───────────────┴────────────────┘
-                        │
-                        ▼
-                 PostgreSQL Database
-                        │
-                        ▼
-                  Redis Cache
-                        │
-                        ▼
-                  REST API (Express)
-                        │
-                        ▼
-             Next.js Frontend Application
-```
+- [ADR 0001: Prisma and raw SQL](decisions/0001-prisma-and-raw-sql.md)
+- [ADR 0002: Deterministic deduplication](decisions/0002-deterministic-deduplication.md)
+- [ADR 0003: Cache-aside Redis](decisions/0003-cache-aside-redis.md)
 
----
+## Guides
 
-## Technology Stack
+- [Local development and Docker](guides/local-development.md)
+- [Adding a provider](guides/adding-a-provider.md)
+- [Testing and debugging](guides/testing-and-debugging.md)
 
-### Frontend
+## Reference
 
-* Next.js (App Router)
-* React
-* TypeScript
-* Tailwind CSS
+- [REST API](reference/api.md)
+- [Database schema](reference/database.md)
+- [Configuration](reference/configuration.md)
 
-### Backend
+## Engineering notes
 
-* Node.js
-* Express
-* TypeScript
+These are development case studies, not production incident reports.
 
-### Database
+- [Description quality](engineering-notes/description-quality.md)
+- [Cross-source deduplication](engineering-notes/cross-source-deduplication.md)
+- [Scraper execution reliability](engineering-notes/scraper-execution-reliability.md)
+- [Standalone scraper dependency container](engineering-notes/standalone-scraper-dependency-container.md)
 
-* PostgreSQL
-* Prisma ORM
-* Raw PostgreSQL (`pg`) for optimized search queries
+## Evidence
 
-### Infrastructure
+- [Verification evidence](evidence/verification.md)
 
-* Docker Compose
-* Redis
+## Documentation conventions
 
-### Authentication
+- **Architecture** explains how the implemented system fits together.
+- **Decisions** record a choice, its context, and its consequences.
+- **Guides** provide steps for completing a task.
+- **Reference** states exact implemented behavior.
+- **Engineering notes** explain a real development problem and how it was verified.
 
-* NextAuth
-
-### Testing
-
-* Vitest
-
----
-
-## Why This Project Exists
-
-Most public job boards expose listings in different formats, with varying levels of data quality. The same position frequently appears across multiple providers under different URLs, descriptions, or metadata.
-
-JobScraper addresses these challenges by introducing a processing pipeline that focuses on data quality rather than simple aggregation.
-
-Major engineering problems solved by the project include:
-
-* Cross-provider duplicate detection
-* Provider-specific HTML extraction
-* Description enrichment
-* Search performance
-* Data normalization
-* Source health monitoring
-* Unified provider architecture
-
-These topics are documented throughout the architecture documentation.
-
----
-
-## Documentation
-
-The complete documentation is available in the `docs` directory.
-
-### Architecture
-
-* Architecture Overview
-* Backend Architecture
-* Frontend Architecture
-* Scraper Engine
-* Job Processing Pipeline
-* Semantic Deduplication
-* Description Enrichment
-* Search System
-* Database Design
-* Caching Strategy
-* Scheduler
-* Authentication
-* Monitoring
-* Deployment
-
-### Guides
-
-* Local Development
-* Docker Setup
-* Adding a New Provider
-* Debugging Scrapers
-* Testing
-* Database Migrations
-
-### Reference
-
-* API Reference
-* Database Schema
-* Environment Variables
-* Folder Structure
-* Scraper Interface
-
-### Engineering Decisions
-
-* Why Prisma and Raw SQL coexist
-* Why semantic deduplication was chosen
-* Why provider-specific enrichment exists
-* Why Redis is used
-* Why the scraper interface is provider-independent
-
----
-
-## Project Structure
-
-```text
-frontend/
-api/
-docs/
-docker-compose.yml
-```
-
-A complete breakdown of the project structure is available in the documentation.
-
----
-
-## Quick Start
-
-### Clone the repository
-
-```bash
-git clone <repository-url>
-cd JobScraper
-```
-
-### Start the application
-
-```bash
-docker compose up --build
-```
-
-The application will start with:
-
-* Frontend
-* Backend API
-* PostgreSQL
-* Redis
-
----
-
-## Screenshots
-
-Screenshots of the application are available in the project documentation.
-
----
-
-## Future Improvements
-
-Potential future enhancements include:
-
-* Distributed scraping
-* Queue-based processing
-* Elasticsearch integration
-* OpenTelemetry tracing
-* Horizontal scraper scaling
-* AI-powered job recommendations
-
----
-
-## License
-
-This project is intended as a portfolio project demonstrating production-oriented full-stack engineering practices.
+Planned capabilities are labeled as planned. Experimental sources are labeled as experimental. Performance and reliability claims require measured evidence.

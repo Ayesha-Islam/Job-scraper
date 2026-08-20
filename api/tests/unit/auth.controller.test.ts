@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Prisma } from '@prisma/client';
 import { AuthController } from '../../src/controllers/auth.controller';
+import { env } from '../../src/config';
 
 vi.mock('bcryptjs', () => ({
     default: {
@@ -43,7 +44,6 @@ describe('AuthController', () => {
         controller = new AuthController(db);
         res = createRes();
 
-        process.env.JWT_SECRET = 'test_secret';
     });
 
     it('register rejects missing fields', async () => {
@@ -311,7 +311,7 @@ describe('AuthController', () => {
                 id: 1,
                 email: 'ayesha@example.com',
             },
-            'test_secret',
+            env.JWT_SECRET,
             {
                 expiresIn: '24h',
             }

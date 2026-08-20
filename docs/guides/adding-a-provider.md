@@ -1,445 +1,126 @@
-# Adding a New Job Provider
+# Adding a provider
 
-## Before You Begin
+A provider adapter should do one job: translate one external source into the
+shared job shape. Global validation, description policy, and deduplication belong
+to the processor.
 
-| Item               | Value                                                                                                           |
-| ------------------ | --------------------------------------------------------------------------------------------------------------- |
-| **Estimated Time** | 30–90 minutes                                                                                                   |
-| **Difficulty**     | Intermediate                                                                                                    |
-| **Prerequisites**  | TypeScript, Playwright (or provider API), familiarity with the Scraper Engine                                   |
-| **Outcome**        | A fully integrated provider that participates in scraping, validation, enrichment, monitoring, and persistence. |
+## Before writing code
 
----
+Confirm that automated access is permitted. Review the provider's terms,
+robots policy, authentication boundaries, and expected request volume. Prefer a
+documented API or static HTTP parsing over browser automation when both are
+available.
 
-# Overview
+Do not add a source whose reliable operation requires bypassing access controls,
+CAPTCHAs, or rate limits.
 
-JobScraper was designed so that new job providers can be added without modifying the core scraping pipeline.
+## 1. Study the current boundary
 
-Each provider is responsible only for collecting raw job information.
+Provider classes and orchestration currently live in `api/src/scrape.ts`.
+Existing adapters demonstrate both Cheerio-based HTTP extraction and Puppeteer
+browser extraction. Reuse the common job and result types rather than defining a
+parallel output shape.
 
-The remainder of the application—including validation, semantic deduplication, enrichment, persistence, caching, and monitoring—is shared automatically.
+A useful adapter returns:
 
-As a result, adding a provider primarily involves implementing provider-specific extraction logic.
+- company;
+- position;
+- location;
+- job type where available;
+- canonical application URL;
+- source name;
+- best listing description available;
+- posting time where the source provides it.
 
----
+The processor will validate and normalize these values.
 
-# How Providers Fit Into the Architecture
+## 2. Implement the smallest extractor
 
-Every provider follows the same execution path.
+Add a provider class in `api/src/scrape.ts` that follows the existing scraper
+contract. Keep selectors and pagination rules inside the class. Apply bounded
+timeouts and collect extraction errors in the scraper result instead of hiding
+them.
 
-```mermaid
-flowchart LR
+Prefer:
 
-Scheduler
+1. a stable JSON or public API response;
+2. server-rendered HTML with Cheerio;
+3. Puppeteer only when the content genuinely requires a browser.
 
--->
+Always release browser pages and other resources in `finally` paths.
 
-Scrape Coordinator
+## 3. Register the provider
 
--->
+Add one `ScrapeJobConfig` entry in
+`ScraperManager.getScrapeJobs()`:
 
-Provider
-
--->
-
-Job Processor
-
--->
-
-Database
-
--->
-
-Search API
+```ts
+{
+  source: 'Provider name',
+  scraper: new ProviderScraper(this.config),
+  query: 'developer',
+  pages: 1,
+}
 ```
 
-Notice that the provider **does not** communicate directly with:
+The `source` string becomes an operator-facing identifier and must remain stable.
+`runOne()` accepts normalized display names or scraper class names.
 
-* PostgreSQL
-* Redis
-* Controllers
-* Search
-* Authentication
+If the source is not yet reliable, place registration behind an explicit
+environment flag following the `ENABLE_EXPERIMENTAL_SOURCES` pattern.
 
-This separation keeps providers small and focused.
+## 4. Define source-aware processing
 
----
+Review the source policies in `api/src/services/job.processor.ts`. Add a policy
+only if this provider differs from the safe defaults:
 
-# Provider Responsibilities
+- whether detail-page enrichment is appropriate;
+- which description wrappers are known noise;
+- whether listing text is usually complete;
+- what should count as an enrichment failure.
 
-A provider is responsible for:
+Do not put a provider-specific selector in the generic deduplication code.
 
-* Discovering jobs
-* Navigating pagination
-* Extracting metadata
-* Returning normalized jobs
+## 5. Add fixtures and tests
 
-A provider is **not** responsible for:
+At minimum, test:
 
-* Deduplication
-* Persistence
-* Validation
-* Description enrichment
-* Cache invalidation
-* Metrics aggregation
+- a normal listing;
+- missing required fields;
+- an empty result page;
+- changed or missing selectors;
+- pagination termination;
+- timeout or request failure;
+- resource cleanup;
+- processing and persistence of the returned job;
+- description fallback if enrichment fails.
 
-Those concerns are handled automatically by the processing pipeline.
+Fixtures should remove personal data and should be small enough to reveal which
+markup the extractor depends on.
 
----
+## 6. Run a controlled smoke test
 
-# Step 1 — Study the Target Website
+Use one page and a conservative request rate. Confirm:
 
-Before writing any code, inspect the provider.
+- jobs found, accepted, skipped, and added are plausible;
+- application URLs lead to the intended role;
+- descriptions contain job content rather than navigation or login text;
+- a second run produces duplicates or updates rather than new copies;
+- the provider failure does not stop other providers.
 
-Determine:
+The CLI currently executes all enabled providers. For a focused run, use the
+protected admin endpoint with a `source` value or add a focused automated test;
+do not temporarily delete other registrations.
 
-* Does it expose an API?
-* Is an RSS feed available?
-* Does it require browser automation?
-* Is JavaScript rendering required?
-* Are detail pages needed?
-* Are there rate limits?
+## 7. Document the boundary
 
-Understanding the provider first prevents unnecessary implementation work.
+Update:
 
----
+- the configured-source count if it appears in user-facing docs;
+- `api/.env.example` and [Configuration](../reference/configuration.md) for a new
+  flag or credential;
+- [Ingestion and data quality](../architecture/ingestion-and-data-quality.md) if
+  the provider requires a new system-wide rule.
 
-# Step 2 — Create the Provider
-
-Create a new provider inside the scraper directory.
-
-Example:
-
-```text
-src/
-└── providers/
-    └── ExampleProvider.ts
-```
-
-Keep provider implementations self-contained.
-
-Avoid referencing unrelated providers.
-
----
-
-# Step 3 — Implement the Scraper Contract
-
-Every provider should expose the same high-level behavior:
-
-```text
-Initialize
-
-↓
-
-Collect Listings
-
-↓
-
-Normalize Jobs
-
-↓
-
-Return Jobs
-```
-
-The provider should return normalized job objects rather than writing directly to the database.
-
----
-
-# Step 4 — Extract Listing Data
-
-Collect the minimum information required by the processing pipeline.
-
-Typical fields include:
-
-* Company
-* Position
-* Location
-* Source
-* URL
-* Posted date
-* Description (if available)
-
-Do not attempt to perform semantic deduplication or business validation here.
-
----
-
-# Step 5 — Normalize Values
-
-Providers expose metadata differently.
-
-Normalize values before returning them.
-
-Examples include:
-
-* Company names
-* Location formats
-* Employment types
-* Dates
-
-Normalization should produce values consistent with existing providers.
-
----
-
-# Step 6 — Register the Provider
-
-Register the provider with the scraping coordinator.
-
-This allows the scheduler to execute it alongside existing providers.
-
-After registration, the provider automatically participates in:
-
-* Scheduled scraping
-* Manual scraping
-* Metrics collection
-* Processing summaries
-
-No changes should be required in the processing pipeline.
-
----
-
-# Step 7 — Run the Provider
-
-Execute a scraping cycle.
-
-```bash
-npm run scrape
-```
-
-Observe the logs.
-
-Verify:
-
-* Provider starts successfully
-* Listings are discovered
-* Jobs enter the processing pipeline
-* Summary metrics are produced
-
----
-
-# Step 8 — Verify Processing
-
-The provider should automatically benefit from the shared processing pipeline.
-
-Verify that jobs pass through:
-
-```text
-Normalization
-
-↓
-
-Validation
-
-↓
-
-Semantic Deduplication
-
-↓
-
-Description Enrichment
-
-↓
-
-Persistence
-```
-
-If additional provider-specific validation is required, implement it without bypassing the shared pipeline.
-
----
-
-# Step 9 — Review Metrics
-
-Every provider should produce operational summaries.
-
-Review metrics such as:
-
-* Jobs discovered
-* Accepted jobs
-* Rejected jobs
-* Duplicate count
-* Enrichment success
-* Execution time
-* Warning count
-
-Unexpected values often indicate extraction issues.
-
----
-
-# Step 10 — Verify Search Results
-
-After scraping completes:
-
-1. Open the frontend.
-2. Search for newly imported jobs.
-3. Verify:
-
-   * Company names
-   * Job titles
-   * Locations
-   * Descriptions
-   * Source attribution
-
-This confirms successful end-to-end integration.
-
----
-
-# Provider Checklist
-
-Before submitting a new provider, verify:
-
-* Listing discovery works.
-* Pagination completes correctly.
-* Required fields are extracted.
-* Normalization is applied.
-* Duplicate jobs are prevented.
-* Descriptions are usable.
-* Metrics appear correctly.
-* Search results are correct.
-* Tests pass.
-
----
-
-# Common Mistakes
-
-## Writing Directly to the Database
-
-Incorrect:
-
-```text
-Provider
-
-↓
-
-Database
-```
-
-Correct:
-
-```text
-Provider
-
-↓
-
-Job Processor
-
-↓
-
-Database
-```
-
-All persistence should occur through the shared processing pipeline.
-
----
-
-## Duplicating Validation Logic
-
-Do not copy validation rules into providers.
-
-The processing pipeline already performs:
-
-* Required field validation
-* Business rules
-* Semantic deduplication
-* Quality validation
-
-Keeping validation centralized ensures consistent behavior across all providers.
-
----
-
-## Returning Provider-Specific Data
-
-Providers should return normalized values.
-
-Avoid leaking provider-specific formats into the remainder of the application.
-
----
-
-## Skipping Error Handling
-
-External providers are unreliable.
-
-Handle:
-
-* Timeouts
-* Missing elements
-* Network failures
-* Empty responses
-
-A provider should fail gracefully without interrupting the overall scraping cycle.
-
----
-
-## Ignoring Detail Pages
-
-Many providers expose only partial descriptions.
-
-If listing pages contain truncated data, implement detail-page extraction rather than persisting incomplete descriptions.
-
----
-
-# Debugging Tips
-
-If a provider produces no jobs:
-
-* Verify selectors.
-* Inspect HTML changes.
-* Confirm pagination.
-* Check network requests.
-* Review provider logs.
-
-If jobs are rejected:
-
-* Inspect skip reasons.
-* Review validation output.
-* Confirm normalization.
-* Verify required fields.
-
-If descriptions are poor:
-
-* Review detail-page extraction.
-* Check quality validation.
-* Inspect cleaned HTML.
-
----
-
-# Testing
-
-Before merging a provider:
-
-* Run unit tests.
-* Execute a full scraping cycle.
-* Confirm semantic deduplication.
-* Verify enrichment.
-* Inspect provider summaries.
-* Search for imported jobs through the frontend.
-
-Every new provider should satisfy the same quality standards as existing providers.
-
----
-
-# Provider Design Principles
-
-When implementing a provider:
-
-* Keep extraction simple.
-* Keep business logic out of the provider.
-* Return normalized jobs.
-* Reuse the shared processing pipeline.
-* Prefer explicit extraction over fragile heuristics.
-* Treat providers as independent plugins.
-
-Following these principles keeps the architecture maintainable as additional providers are added.
-
----
-
-# Related Documentation
-
-For additional information, see:
-
-* Scraper Engine
-* Job Processing Pipeline
-* Description Enrichment
-* Semantic Deduplication
-* Monitoring & Observability
-* Testing Guide
-* Scraper Interface Reference
+Do not document a source as supported until its extraction, processing, and
+second-run deduplication have been verified.

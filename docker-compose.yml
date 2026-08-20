@@ -38,8 +38,6 @@ services:
       dockerfile: Dockerfile
     container_name: job-scraper-api
     restart: unless-stopped
-    env_file:
-      - ./api/.env
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -48,6 +46,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:?ADMIN_EMAILS must be set}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      DB_SSL: ${DB_SSL:-false}
     ports:
       - "3001:3001"
     depends_on:
@@ -71,8 +73,8 @@ services:
       AUTH_TRUST_HOST: "true"
       NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
       INTERNAL_API_URL: http://api:3001/api/v1
-      AUTH_SECRET: ${AUTH_SECRET:-9GnG0RJstSlVEFAjU5J1kJjC7TWKiK97H0BD6i622SU=}
-      NEXTAUTH_SECRET: ${AUTH_SECRET:-9GnG0RJstSlVEFAjU5J1kJjC7TWKiK97H0BD6i622SU=}
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET must be set}
+      NEXTAUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET must be set}
     ports:
       - "3000:3000"
     depends_on:

@@ -7,6 +7,13 @@ export default defineConfig({
     globals: true,
     clearMocks: true,
     restoreMocks: true,
+    env: {
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://test:test@localhost:5432/jobscraper_test',
+      JWT_SECRET: 'test-only-secret-not-used-outside-vitest',
+      REDIS_HOST: 'localhost',
+      REDIS_PORT: '6379',
+    },
   },
   resolve: {
     alias: {

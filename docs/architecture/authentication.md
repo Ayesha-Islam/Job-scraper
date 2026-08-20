@@ -1,520 +1,117 @@
 # Authentication Architecture
 
-## Decision Record
+## Summary
 
-| Field                       | Value                                                                                                                                                                 |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**                  | Accepted                                                                                                                                                              |
-| **Decision**                | Implement authentication using NextAuth with Prisma as the persistence layer while isolating authentication from the scraping pipeline and business processing logic. |
-| **Date**                    | June 2026                                                                                                                                                             |
-| **Owner**                   | JobScraper Architecture                                                                                                                                               |
-| **Related Components**      | `auth.ts`, `auth.controller.ts`, `auth-utils.ts`, `SessionProvider.tsx`, Prisma Schema                                                                                |
-| **Alternatives Considered** | Custom JWT authentication, Session-based authentication, Third-party authentication services                                                                          |
-| **Primary Motivation**      | Provide secure session management while minimizing custom authentication infrastructure and integrating cleanly with the existing relational data model.              |
+JobScraper uses a two-layer authentication flow:
 
----
+1. The Express API validates credentials and issues a backend JWT.
+2. The Next.js frontend uses NextAuth Credentials to hold that JWT inside its own JWT-backed session.
 
-# Summary
+NextAuth does not query PostgreSQL or Prisma directly. User lookup, password verification, registration, and backend authorization remain responsibilities of the Express API.
 
-Authentication is the only subsystem within JobScraper responsible for user identity and access control.
+## Components
 
-Unlike the scraping engine, scheduler, or search system, authentication is not concerned with collecting or processing job data.
+| Component | Responsibility |
+| --- | --- |
+| `frontend/lib/auth.ts` | Configures NextAuth Credentials, session callbacks, and sign-in behavior. |
+| `frontend/app/api/auth/[...nextauth]/route.ts` | Exposes the NextAuth route handlers. |
+| `frontend/components/SessionProvider.tsx` | Makes the NextAuth session available to client components. |
+| `frontend/lib/auth-utils.ts` | Provides frontend authentication hooks and sign-out behavior. |
+| `api/src/controllers/auth.controller.ts` | Registers users, validates credentials, and issues backend JWTs. |
+| `api/src/middleware/auth.middleware.ts` | Verifies backend bearer tokens and protects user/admin endpoints. |
+| Prisma `User` model | Stores user identity and bcrypt password hashes. |
 
-Its responsibilities are limited to:
-
-* User authentication
-* Session management
-* Authorization
-* Protected routes
-* User-specific resources
-* Saved jobs
-
-Authentication operates independently from the scraping pipeline, allowing user management to evolve without affecting data collection.
-
----
-
-# Problem Statement
-
-The majority of JobScraper is publicly accessible.
-
-Searching jobs, browsing listings, and viewing job details require no authentication.
-
-However, certain features require persistent user identity.
-
-Examples include:
-
-* Saving jobs
-* Viewing saved jobs
-* Managing personal preferences
-* Accessing protected endpoints
-
-These capabilities require a reliable authentication system that integrates with the application's relational database.
-
----
-
-# Background
-
-Authentication represents a fundamentally different workload than job aggregation.
-
-Where scraping focuses on:
-
-* High-volume ingestion
-* Search
-* Caching
-
-authentication focuses on:
-
-* Identity
-* Sessions
-* Relationships
-* Security
-
-These requirements align well with relational database modeling and ORM abstractions.
-
-As a result, authentication is intentionally implemented using Prisma rather than raw SQL.
-
----
-
-# Design Goals
-
-The authentication subsystem was designed around several principles.
-
-## Secure Session Management
-
-User identity should persist securely across requests without exposing sensitive information.
-
----
-
-## Separation of Concerns
-
-Authentication should remain independent from scraping, searching, and processing logic.
-
----
-
-## Relational Integrity
-
-Users, sessions, and saved jobs should be represented through explicit database relationships.
-
----
-
-## Minimal Custom Infrastructure
-
-Authentication is a solved problem.
-
-Rather than implementing a custom authentication framework, JobScraper relies on NextAuth for session management and Prisma for persistence.
-
----
-
-## Extensibility
-
-Future authentication providers and user-specific features should integrate without requiring architectural changes.
-
----
-
-# Alternatives Considered
-
-## Custom JWT Authentication
-
-Advantages
-
-* Complete control
-* Highly customizable
-
-Disadvantages
-
-* Increased security responsibility
-* More implementation effort
-* Additional maintenance
-
-**Rejected**
-
----
-
-## Session-Based Authentication
-
-Advantages
-
-* Mature approach
-* Strong security
-
-Disadvantages
-
-* Additional infrastructure management
-
-**Partially Adopted**
-
----
-
-## Third-Party Authentication Service
-
-Advantages
-
-* Reduced implementation effort
-
-Disadvantages
-
-* External dependency
-* Vendor lock-in
-* Reduced control
-
-**Rejected**
-
----
-
-## NextAuth + Prisma
-
-Advantages
-
-* Mature ecosystem
-* Type-safe integration
-* Session management
-* Relational persistence
-* Minimal custom code
-
-Disadvantages
-
-* Framework-specific abstractions
-
-**Selected**
-
----
-
-# Selected Design
-
-Authentication is isolated from the remainder of the backend.
-
-```mermaid
-flowchart LR
-
-User
-
--->
-
-Frontend
-
--->
-
-NextAuth
-
--->
-
-Auth Controller
-
--->
-
-Prisma
-
--->
-
-PostgreSQL
-```
-
-The scraping pipeline never interacts with authentication components.
-
----
-
-# Architecture
-
-Authentication responsibilities are distributed across several components.
-
-```text
-Frontend
-
-↓
-
-SessionProvider.tsx
-
-↓
-
-NextAuth
-
-↓
-
-auth.ts
-
-↓
-
-auth.controller.ts
-
-↓
-
-Prisma
-
-↓
-
-PostgreSQL
-```
-
-Each component owns a single responsibility.
-
----
-
-# Why `auth.ts` Exists
-
-`auth.ts` centralizes authentication configuration.
-
-Responsibilities include:
-
-* Authentication providers
-* Session configuration
-* Callbacks
-* Security settings
-* Authentication strategy
-
-Keeping configuration isolated prevents authentication logic from spreading across the application.
-
----
-
-# Why `auth.controller.ts` Exists
-
-The authentication controller forms the boundary between HTTP requests and authentication services.
-
-Responsibilities include:
-
-* Processing authentication requests
-* Returning authentication responses
-* Coordinating with NextAuth
-* Delegating persistence to Prisma
-
-Business rules remain outside the controller.
-
----
-
-# Why `auth-utils.ts` Exists
-
-Authentication utilities contain reusable helper functions used across the authentication subsystem.
-
-Examples include:
-
-* Session validation
-* Authorization helpers
-* User lookup helpers
-* Shared authentication logic
-
-This prevents duplication throughout the codebase.
-
----
-
-# Why `SessionProvider.tsx` Exists
-
-The frontend requires awareness of the current authentication state.
-
-`SessionProvider.tsx` exposes authentication context to React components.
-
-Responsibilities include:
-
-* Session availability
-* Authentication state
-* Protected component rendering
-* User context
-
-Business authorization decisions remain on the server.
-
----
-
-# Authentication Lifecycle
-
-The authentication flow follows a predictable sequence.
+## Sign-in flow
 
 ```mermaid
 sequenceDiagram
+    participant U as User
+    participant N as Next.js / NextAuth
+    participant A as Express API
+    participant P as Prisma / PostgreSQL
 
-participant User
-
-participant Frontend
-
-participant NextAuth
-
-participant AuthController
-
-participant Prisma
-
-participant PostgreSQL
-
-User->>Frontend: Sign In
-
-Frontend->>NextAuth: Authentication Request
-
-NextAuth->>AuthController: Validate
-
-AuthController->>Prisma: User Lookup
-
-Prisma->>PostgreSQL: Query
-
-PostgreSQL-->>Prisma: User
-
-Prisma-->>AuthController: User
-
-AuthController-->>NextAuth: Success
-
-NextAuth-->>Frontend: Session
-
-Frontend-->>User: Authenticated
+    U->>N: Submit email and password
+    N->>A: POST /api/v1/auth/login
+    A->>P: Find user by normalized email
+    P-->>A: User and password hash
+    A->>A: Verify with bcrypt
+    A-->>N: User data and 24-hour backend JWT
+    N->>N: Store backend JWT in NextAuth JWT
+    N-->>U: NextAuth session
 ```
 
----
+The backend JWT is exposed to authenticated frontend code as `session.backendToken`. Requests to protected Express endpoints send it as:
 
-# Authorization
+```http
+Authorization: Bearer <backend-token>
+```
 
-Authentication answers:
+## Registration
 
-> "Who is the user?"
+`POST /api/v1/auth/register`:
 
-Authorization answers:
+- requires `name`, `email`, and `password`;
+- normalizes the email to lowercase;
+- requires a two-word full name;
+- requires a password of at least eight characters;
+- hashes the password with bcrypt before persistence;
+- returns public user fields without the password hash.
 
-> "What is this user allowed to access?"
+Registration does not automatically create a NextAuth session. The user signs in after registration.
 
-JobScraper separates these concerns.
+## Session lifetime
 
-Authentication establishes identity.
+Both layers use a 24-hour lifetime:
 
-Protected routes and backend services enforce authorization rules.
+- the Express API signs backend JWTs with `expiresIn: "24h"`;
+- NextAuth uses a JWT session with `maxAge: 24 * 60 * 60`.
 
----
+Keeping these lifetimes aligned prevents a frontend session from remaining valid after its embedded backend credential has expired. Token refresh is not currently implemented.
 
-# Protected Resources
+## Authorization
 
-Authentication is required only for user-specific functionality.
+### Public endpoints
 
-Examples include:
+Job browsing, job details, statistics, registration, login, and health endpoints are public.
 
-* Saved jobs
-* Account management
-* Protected API endpoints
+### Authenticated user endpoints
 
-Public job browsing remains available without authentication.
+The following require a valid backend JWT:
 
-This improves accessibility while protecting user-specific data.
+- `GET /api/v1/auth/me`
+- all `/api/v1/saved-jobs` endpoints
 
----
+### Administrative endpoints
 
-# Why Prisma Is Used Here
+All `/api/v1/admin/*` endpoints require:
 
-Unlike search queries, authentication primarily consists of relational CRUD operations.
+1. a valid backend JWT; and
+2. a token email listed in the comma-separated `ADMIN_EMAILS` environment variable.
 
-Examples include:
+If `ADMIN_EMAILS` is empty or the email is not listed, access is denied with `403 Forbidden`. This is an allowlist, not a database-backed role system.
 
-* User lookup
-* Session persistence
-* Account relationships
-* Saved jobs
+## Secrets
 
-These operations benefit significantly from Prisma's:
+`JWT_SECRET` signs and verifies backend JWTs. `NEXTAUTH_SECRET` signs the frontend NextAuth session. They are independent secrets and must be set explicitly.
 
-* Type safety
-* Relationship management
-* Migration tooling
-* Developer experience
+The application no longer uses hard-coded fallback secrets:
 
-Raw SQL would provide little additional value for this workload.
+- backend startup fails when `JWT_SECRET` is missing;
+- Docker Compose fails configuration when `JWT_SECRET`, `AUTH_SECRET`, or `ADMIN_EMAILS` is missing.
 
----
+Do not commit real values. Copy the supplied `.env.example` files and replace every placeholder locally.
 
-# Separation from the Scraping Pipeline
+## Known limitations
 
-Authentication has no interaction with:
+- Credentials authentication has no refresh-token flow.
+- Email verification, password reset, multi-factor authentication, and account lockout are not implemented.
+- Administrative authorization uses configuration rather than a persisted role model.
+- API rate limiting is not implemented.
+- Changing `ADMIN_EMAILS` affects new requests immediately, but existing JWTs remain valid for authentication until expiry.
 
-* Provider scrapers
-* Scheduler
-* Job Processor
-* Description enrichment
-* Semantic deduplication
+## Related documentation
 
-This separation ensures that user management evolves independently from data ingestion.
-
----
-
-# Engineering Decisions
-
-## Why NextAuth?
-
-Authentication is a mature problem with well-established solutions.
-
-Leveraging NextAuth reduces custom security code while providing reliable session management.
-
----
-
-## Why Keep Authentication Separate?
-
-Identity management and scraping solve unrelated problems.
-
-Keeping these systems isolated reduces coupling and simplifies future development.
-
----
-
-## Why Use Prisma Instead of Raw SQL?
-
-Authentication relies on stable relational models rather than dynamic query generation.
-
-Prisma provides excellent abstractions for this category of workload.
-
----
-
-## Why Protect Only User-Specific Features?
-
-The primary purpose of JobScraper is public job discovery.
-
-Requiring authentication for browsing would unnecessarily restrict access.
-
-Authentication is therefore reserved for features that require persistent user identity.
-
----
-
-# Lessons Learned
-
-Authentication proved to be one of the few areas where ORM abstractions consistently improved developer productivity.
-
-Unlike dynamic search queries, authentication operations are highly relational and change infrequently.
-
-Using Prisma here resulted in cleaner code, simpler migrations, and more maintainable relationships.
-
----
-
-# Trade-offs
-
-Advantages
-
-* Mature authentication ecosystem
-* Secure session management
-* Excellent relational modeling
-* Reduced custom security code
-* Clear separation from scraping
-
-Disadvantages
-
-* Additional framework dependency
-* Requires understanding of NextAuth abstractions
-* Separate authentication lifecycle from the remainder of the backend
-
-These trade-offs were accepted because they significantly reduce authentication complexity while improving maintainability.
-
----
-
-# Future Improvements
-
-Potential enhancements include:
-
-* OAuth providers
-* Email verification
-* Password reset flows
-* Multi-factor authentication
-* User preferences
-* Role-based authorization
-* Audit logging
-
-The current architecture allows these features to be added without affecting the scraping subsystem.
-
----
-
-# Related Documentation
-
-This document describes the authentication architecture.
-
-Related documents include:
-
-* Backend Architecture
-* Frontend Architecture
-* Database Design
-* API Reference
-* Environment Variables
-* Engineering Decision: Prisma vs Raw SQL
+- [REST API reference](../reference/api.md)
+- [Configuration](../reference/configuration.md)
+- [Database](../reference/database.md)
+- [Architecture overview](overview.md)

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { env } from '../config';
 
 export class AuthController {
   constructor(private db: PrismaClient) { }
@@ -113,7 +114,7 @@ export class AuthController {
 
       const token = jwt.sign(
         { id: user.id, email: user.email },
-        process.env.JWT_SECRET || 'your_secret_key',
+        env.JWT_SECRET,
         { expiresIn: '24h' }
       );
 

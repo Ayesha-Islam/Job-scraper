@@ -1,139 +1,135 @@
-# Job Scraper
+# JobScraper
 
-## What is Job Scraper?
+JobScraper is a full-stack remote-job aggregator built around a data-quality
+problem: different job boards describe the same vacancy in incompatible and
+sometimes unreliable ways.
 
-Job Scraper is a full-stack app for collecting, searching, and browsing job listings from multiple providers. It pairs an Express API with a Next.js frontend and uses PostgreSQL, Redis, and browser scraping to keep listings live and searchable.
+The system collects candidate listings, sends every source through shared
+validation and description-quality rules, deduplicates jobs with a
+database-enforced business key, and exposes the resulting dataset through an
+Express API and Next.js interface.
 
-## Features
+## Why this project matters
 
-- Automated scraping from external job sources
-- Search and filter jobs by keyword, location, source, and type
-- User registration, login, and saved jobs
-- Admin controls for scraping and cache management
-- Redis caching for faster query responses
-- Health checks for API, database, and Redis
+A scraper can return HTML and still produce bad data. Real extraction output
+included missing descriptions, authentication walls, navigation text, unstable
+URLs, and the same role published through different sources.
 
-## Tech Stack
+JobScraper addresses that boundary explicitly:
 
-- Backend: Node.js, Express, Prisma, PostgreSQL, Redis
-- Scraping: Puppeteer, Cheerio
-- Frontend: Next.js, React, TypeScript, Tailwind CSS
-- Auth: JWT, bcryptjs, NextAuth
-- Dev tools: Docker, Vitest, Prisma
-
-## Repository Layout
-
-- `api/` — backend service, routes, scraping, and database schema
-- `frontend/` — Next.js UI, auth, and API integration
-- `docs/` — detailed architecture, environment, and API references
-- `docker-compose.yml` — local Docker development stack
-- `DOCKER_SETUP.md` — Docker usage and troubleshooting
-
-## Quick Start
-
-### Clone the repository
-
-```bash
-git clone https://github.com/Ayesha-Islam/Job-scraper.git
-cd Job-scraper
+```text
+Provider extraction
+  → normalization and validation
+  → source-aware description handling
+  → deterministic deduplication
+  → PostgreSQL
+  → cache invalidation
+  → searchable API and web interface
 ```
 
-### Start the backend
+The central engineering decision is to treat external data as untrusted rather
+than letting each provider write directly to the database.
+
+## What is implemented
+
+- Eight provider adapters enabled by default; NoDesk is experimental.
+- Shared validation with explicit rejection reasons and quality metrics.
+- Description cleanup for page wrappers, authentication walls, and other noise.
+- Deterministic `companyKey + positionKey + locationKey` deduplication backed by
+  a PostgreSQL unique constraint.
+- Parameterized SQL search with filtering, ordering, counts, and pagination.
+- Redis cache-aside reads with bounded TTLs and write-path invalidation.
+- Registration, login, saved jobs, statistics, and health endpoints.
+- JWT-protected administrative routes with an email allowlist.
+- Daily in-process scraping at 02:00 in the server's local timezone.
+
+## Verification
+
+The reviewed working tree passes:
+
+- **126 backend tests across 17 files**
+- **Backend TypeScript compiler check (`tsc --noEmit`)**
+- **Next.js production build**
+
+A historical scrape snapshot and a reproducible description-cleaning
+microbenchmark are documented without turning them into unsupported production
+performance claims. See [Verification evidence](docs/evidence/verification.md).
+
+## Capability status
+
+| Status | Capability |
+|---|---|
+| Implemented | Shared ingestion, deterministic deduplication, search, caching, authentication, saved jobs, admin controls |
+| Experimental | NoDesk provider adapter |
+| Planned | Durable job queue, distributed scheduling, full-text/trigram search, scalable cache invalidation, rate limiting, token refresh |
+
+## Technology
+
+- **Backend:** Node.js, Express, TypeScript, Prisma, PostgreSQL, Redis
+- **Scraping:** Puppeteer, Cheerio
+- **Frontend:** Next.js, React, Tailwind CSS, NextAuth
+- **Verification:** Vitest, TypeScript builds, reproducible microbenchmark
+- **Local stack:** Docker Compose
+
+## Run locally
+
+Prerequisites: Node.js 20+, PostgreSQL, and Redis. The API bootstrap currently
+requires both data services to be reachable; the standalone scraper can continue
+when its cache connection is unavailable.
 
 ```bash
 cd api
+cp .env.example .env
 npm install
 npm run prisma:generate
 npm run prisma:migrate
 npm run dev
 ```
 
-Backend default: `http://localhost:3001`
-
-### Start the frontend
+In another terminal:
 
 ```bash
-cd ../frontend
+cd frontend
+cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-Frontend default: `http://localhost:3000`
+Open `http://localhost:3000`. Replace all example secrets before starting the
+applications. The complete setup, Docker workflow, and troubleshooting steps are
+in [Local development](docs/guides/local-development.md).
 
-## Docker
+## Current boundaries
 
-Start the full stack:
+- Providers execute sequentially inside the API process.
+- The scheduler has an in-memory lock, not a distributed lease.
+- Search uses leading-wildcard PostgreSQL `ILIKE`; database search latency has
+  not been benchmarked.
+- Pagination values are parsed but are not yet capped to safe maximums.
+- Redis invalidation uses `KEYS`, which is suitable only for the current small
+  keyspace.
+- Provider HTML, access policies, and availability can change independently of
+  this repository.
+- Authentication does not yet include refresh tokens, password reset, email
+  verification, MFA, or rate limiting.
 
-```bash
-docker compose up --build
+## Documentation
+
+- [Project case study](docs/case-study.md)
+- [Architecture overview](docs/architecture/overview.md)
+- [Documentation index](docs/README.md)
+- [REST API reference](docs/reference/api.md)
+- [Verification evidence](docs/evidence/verification.md)
+- [Standalone scraper dependency incident](docs/engineering-notes/standalone-scraper-dependency-container.md)
+
+## Repository layout
+
+```text
+api/       Express API, processing pipeline, scrapers, Prisma schema, tests
+frontend/  Next.js interface and authentication bridge
+docs/      Case study, architecture, decisions, guides, reference, evidence
 ```
-
-Stop services:
-
-```bash
-docker compose down
-```
-
-Remove local database/cache data:
-
-```bash
-docker compose down -v
-```
-
-## Environment Configuration
-
-The README keeps environment settings brief. Full variables are documented in `docs/reference/environment-variables.md`.
-
-Backend environment file: `api/.env`
-Frontend environment file: `frontend/.env.local`
-
-Key variables:
-- `DATABASE_URL` — PostgreSQL connection string
-- `REDIS_URL` / `REDIS_HOST` + `REDIS_PORT` — Redis config
-- `JWT_SECRET` — backend auth signing secret
-- `NEXTAUTH_SECRET` / `AUTH_SECRET` — frontend auth secrets
-- `NEXTAUTH_URL` — frontend public URL
-- `NEXT_PUBLIC_API_URL` / `INTERNAL_API_URL` — API base URLs
-
-## API Overview
-
-Base path: `/api/v1`
-
-- `GET /jobs` — list and filter jobs
-- `GET /jobs/search` — advanced search
-- `GET /jobs/:id` — job details
-- `GET /stats` — application statistics
-- `POST /auth/register` — register user
-- `POST /auth/login` — login
-- `GET /auth/me` — current user info
-- `POST /admin/scrape` — trigger scraping
-- `DELETE /admin/cache` — clear cache
-
-For a complete API reference, see `docs/reference/api.md`.
-
-## Architecture Summary
-
-- `api/src/app.ts` — Express app and middleware setup
-- `api/src/routes/index.ts` — API route definitions
-- `api/src/controllers/` — controllers for auth, jobs, stats, admin flows
-- `api/src/services/` — scraped data processing, caching, and business rules
-- `api/prisma/schema.prisma` — database models for jobs and users
-- `frontend/app/` — Next.js pages and route handlers
-- `frontend/components/` — visual UI components
-- `frontend/lib/` — API client and auth utilities
-
-For design rationale, see `docs/architecture/overview.md`.
-
-## Run the App
-
-1. Start backend: `npm run dev` (from `api/`)
-2. Start frontend: `npm run dev` (from `frontend/`)
-3. Open `http://localhost:3000`
-
-## Contributing
-
-Contributions are welcome. Open issues or pull requests for bug fixes, improvements, or documentation updates.
 
 ## License
 
-Licensed under the ISC License.
+Licensed under the [ISC License](LICENSE).

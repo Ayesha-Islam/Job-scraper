@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { Container } from '../container';
 import { db } from '../lib/prisma';
-import { requireAuth } from '../middleware/auth.middleware';
+import { requireAdmin, requireAuth } from '../middleware/auth.middleware';
 import { SavedJobController } from '../controllers/saved-job.controller';
 import { SavedJobService } from '../services/saved-job.service';
 
@@ -75,8 +75,13 @@ export function createRoutes(container: Container): Router {
   router.get(`${API_V1}/stats`, statsController.getStats.bind(statsController));
   router.get(`${API_V1}/stats/sources`, statsController.getStats.bind(statsController));
 
-  router.post(`${API_V1}/admin/scrape`, adminController.triggerScrape.bind(adminController));
-  router.get(`${API_V1}/admin/scrape`, (_req: Request, res: Response) => {
+  router.post(
+    `${API_V1}/admin/scrape`,
+    requireAuth,
+    requireAdmin,
+    adminController.triggerScrape.bind(adminController)
+  );
+  router.get(`${API_V1}/admin/scrape`, requireAuth, requireAdmin, (_req: Request, res: Response) => {
     res.status(405).json({
       success: false,
       error: 'Method not allowed. Use POST /api/v1/admin/scrape.',
@@ -84,10 +89,30 @@ export function createRoutes(container: Container): Router {
     });
   });
 
-  router.get(`${API_V1}/admin/scrape/logs`, adminController.getScrapeLogs.bind(adminController));
-  router.get(`${API_V1}/admin/scrape/stats`, adminController.getScrapeStats.bind(adminController));
-  router.delete(`${API_V1}/admin/cache`, adminController.clearCache.bind(adminController));
-  router.get(`${API_V1}/admin/cache/stats`, adminController.getCacheStats.bind(adminController));
+  router.get(
+    `${API_V1}/admin/scrape/logs`,
+    requireAuth,
+    requireAdmin,
+    adminController.getScrapeLogs.bind(adminController)
+  );
+  router.get(
+    `${API_V1}/admin/scrape/stats`,
+    requireAuth,
+    requireAdmin,
+    adminController.getScrapeStats.bind(adminController)
+  );
+  router.delete(
+    `${API_V1}/admin/cache`,
+    requireAuth,
+    requireAdmin,
+    adminController.clearCache.bind(adminController)
+  );
+  router.get(
+    `${API_V1}/admin/cache/stats`,
+    requireAuth,
+    requireAdmin,
+    adminController.getCacheStats.bind(adminController)
+  );
 
   return router;
 }

@@ -2,6 +2,8 @@ import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoutes } from '../../src/routes';
+import jwt from 'jsonwebtoken';
+import { env } from '../../src/config';
 
 function createTestApp(container: any) {
     const app = express();
@@ -178,9 +180,11 @@ function createContainer() {
 describe('API route wiring', () => {
     let container: ReturnType<typeof createContainer>;
     let app: express.Express;
+    const adminEmail = 'admin@example.com';
 
     beforeEach(() => {
         vi.clearAllMocks();
+        process.env.ADMIN_EMAILS = adminEmail;
 
         container = createContainer();
         app = createTestApp(container);
@@ -302,8 +306,15 @@ describe('API route wiring', () => {
     });
 
     it('GET /api/v1/admin/scrape returns 405 and points to POST endpoint', async () => {
+        const token = jwt.sign(
+            { id: 1, email: adminEmail },
+            env.JWT_SECRET,
+            { expiresIn: '5m' }
+        );
+
         const res = await request(app)
             .get('/api/v1/admin/scrape')
+            .set('Authorization', `Bearer ${token}`)
             .expect(405);
 
         expect(res.body).toEqual({

@@ -1,503 +1,164 @@
-# Local Development Guide
+# Local development
 
-## Overview
+This guide covers the shortest path to a working development environment and
+the equivalent Docker workflow.
 
-This guide explains how to set up JobScraper for local development.
+## Prerequisites
 
-By the end of this guide you will have:
+- Node.js 20 or later
+- npm
+- PostgreSQL 16 or a compatible recent version
+- Redis 7 (required by the current API startup path)
+- Docker with Compose, if using the container workflow
 
-* PostgreSQL running
-* Redis running
-* Backend API running
-* Frontend running
-* Database migrated
-* Authentication working
-* Search endpoints available
-* Scraper ready to execute
+## Run services on the host
 
-This guide assumes no prior knowledge of the project.
-
----
-
-# Prerequisites
-
-Before cloning the repository, install the following software.
-
-## Required Software
-
-| Software   | Recommended Version |
-| ---------- | ------------------- |
-| Node.js    | 22.x LTS            |
-| npm        | Latest              |
-| PostgreSQL | 16+                 |
-| Redis      | 7+                  |
-| Git        | Latest              |
-
----
-
-## Optional
-
-These tools improve the development experience.
-
-* Docker Desktop / Docker Engine
-* pgAdmin
-* Redis Insight
-* VS Code
-
----
-
-# Clone the Repository
-
-```bash
-git clone <repository-url>
-
-cd JobScraper
-```
-
----
-
-# Repository Structure
-
-```text
-JobScraper/
-
-api/
-
-frontend/
-
-docs/
-```
-
-Development primarily occurs inside the following applications.
-
-* `api`
-* `frontend`
-
----
-
-# Install Dependencies
-
-Backend
+### 1. Configure the API
 
 ```bash
 cd api
-
+cp .env.example .env
 npm install
 ```
 
-Frontend
+Edit `api/.env`. At minimum, provide a reachable `DATABASE_URL`, a reachable
+Redis configuration, a long random `JWT_SECRET`, and an `ADMIN_EMAILS` value if
+you need admin routes.
+
+Generate the Prisma client and apply development migrations:
 
 ```bash
-cd ../frontend
-
-npm install
+npm run prisma:generate
+npm run prisma:migrate
 ```
 
----
-
-# Configure Environment Variables
-
-Create local environment files.
-
-Backend
-
-```text
-api/.env
-```
-
-Frontend
-
-```text
-frontend/.env.local
-```
-
-Refer to:
-
-```text
-docs/reference/environment-variables.md
-```
-
-for a complete description of every configuration option.
-
----
-
-# Start PostgreSQL
-
-Ensure PostgreSQL is running before starting the backend.
-
-Typical development database:
-
-```text
-Host
-
-localhost
-
-Port
-
-5432
-```
-
-Verify connectivity before continuing.
-
----
-
-# Start Redis
-
-Redis must be running before launching the API.
-
-Typical configuration:
-
-```text
-Host
-
-localhost
-
-Port
-
-6379
-```
-
-The backend automatically attempts to establish a Redis connection during startup.
-
----
-
-# Run Database Migrations
-
-Navigate to the backend.
-
-```bash
-cd api
-```
-
-Execute Prisma migrations.
-
-```bash
-npx prisma migrate deploy
-```
-
-During development you may instead use:
-
-```bash
-npx prisma migrate dev
-```
-
-This creates the local database schema.
-
----
-
-# Generate Prisma Client
-
-Whenever the schema changes:
-
-```bash
-npx prisma generate
-```
-
-The generated client will be used throughout the backend.
-
----
-
-# Start the Backend
-
-From the API directory:
+Start the API:
 
 ```bash
 npm run dev
 ```
 
-A successful startup should include messages indicating:
+It listens on `http://localhost:3001` by default.
 
-* Environment loaded
-* Database connected
-* Redis connected
-* Application initialized
-* HTTP server listening
+### 2. Configure the frontend
 
-The API is available at:
-
-```text
-http://localhost:3001
-```
-
----
-
-# Start the Frontend
-
-Open a second terminal.
+In another terminal:
 
 ```bash
 cd frontend
-
+cp .env.example .env.local
+npm install
 npm run dev
 ```
 
-The frontend is available at:
+Replace the example `NEXTAUTH_SECRET` first. The frontend runs at
+`http://localhost:3000` and calls the API at the URL in
+`NEXT_PUBLIC_API_URL`.
 
-```text
-http://localhost:3000
+### 3. Verify the stack
+
+```bash
+curl http://localhost:3001/health
+curl http://localhost:3001/api/v1/jobs
 ```
 
----
+Then open `http://localhost:3000`.
 
-# Verify the Installation
+## Run with Docker Compose
 
-Confirm that the following components are operational.
+From the repository root:
 
-| Component       | Expected Result        |
-| --------------- | ---------------------- |
-| Frontend        | Opens successfully     |
-| Backend         | Running                |
-| PostgreSQL      | Connected              |
-| Redis           | Connected              |
-| Health Endpoint | Returns healthy status |
+```bash
+cp .env.example .env
+```
 
-If all components are operational, the development environment is ready.
+Replace all placeholder passwords and secrets, then run:
 
----
+```bash
+docker compose up --build
+```
 
-# Running the Scraper
+Useful lifecycle commands:
 
-To execute a scraping cycle manually:
+```bash
+docker compose ps
+docker compose logs -f api
+docker compose down
+```
+
+`docker compose down -v` also deletes the named PostgreSQL and Redis volumes.
+Use it only when you intend to discard local data.
+
+Compose requires `JWT_SECRET`, `AUTH_SECRET`, and `ADMIN_EMAILS`; configuration
+fails early when they are absent.
+
+## Run a scrape
+
+The CLI runs all enabled providers:
 
 ```bash
 cd api
-
 npm run scrape
 ```
 
-During execution you should observe:
+The admin API can run all providers or one named provider, but it requires a
+backend JWT whose email is present in `ADMIN_EMAILS`. See the
+[API reference](../reference/api.md) for the request.
 
-* Provider initialization
-* Job discovery
-* Validation
-* Semantic deduplication
-* Description enrichment
-* Database persistence
-* Provider summaries
-
----
-
-# Viewing Scraped Jobs
-
-After a successful scraping run:
-
-Open
-
-```text
-http://localhost:3000
-```
-
-Browse the Jobs page.
-
-The frontend retrieves job listings through the backend API.
-
----
-
-# Authentication
-
-Authentication is optional for browsing jobs.
-
-Authentication is required for:
-
-* Saving jobs
-* Viewing saved jobs
-* User-specific features
-
-Authentication setup is documented separately.
-
-```text
-docs/architecture/authentication.md
-```
-
----
-
-# Development Workflow
-
-A typical development session follows this sequence.
-
-```text
-Pull Latest Changes
-
-↓
-
-Install Dependencies
-
-↓
-
-Start PostgreSQL
-
-↓
-
-Start Redis
-
-↓
-
-Run Migrations
-
-↓
-
-Start Backend
-
-↓
-
-Start Frontend
-
-↓
-
-Run Scraper (Optional)
-
-↓
-
-Develop
-
-↓
-
-Run Tests
-```
-
----
-
-# Common Commands
-
-## Backend
+NoDesk is experimental. Enable it explicitly only for a test run:
 
 ```bash
-npm run dev
+ENABLE_EXPERIMENTAL_SOURCES=true npm run scrape
 ```
 
-Starts the development server.
+Before scraping an external site, verify its terms, robots policy, and permitted
+request rate.
 
----
+## Database changes
+
+Edit `api/prisma/schema.prisma`, then create and apply a development migration:
 
 ```bash
-npm run scrape
+cd api
+npm run prisma:migrate
+npm run prisma:generate
 ```
 
-Runs every configured provider.
-
----
+Review the generated SQL before committing it. Use Prisma Studio to inspect
+local data:
 
 ```bash
+npm run prisma:studio
+```
+
+The schema and constraints are described in the
+[database reference](../reference/database.md).
+
+## Verification before a change is shared
+
+```bash
+cd api
 npm test
+npm run build
+
+cd ../frontend
+npm run type-check
+npm run build
 ```
 
-Runs the test suite.
+For focused investigation and live provider checks, see
+[Testing and debugging](testing-and-debugging.md).
 
----
+## Common startup failures
 
-## Prisma
+| Symptom | Check |
+|---|---|
+| API exits at startup | `JWT_SECRET` exists and is not blank |
+| Prisma cannot connect | `DATABASE_URL`, PostgreSQL port, and database existence |
+| Admin route returns `403` | Token email exactly matches an `ADMIN_EMAILS` entry |
+| Frontend auth fails | `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, and API URLs |
+| API exits while connecting to cache | Start Redis and verify `REDIS_URL` or `REDIS_HOST`/`REDIS_PORT` |
+| Cache disconnects after startup | Reads should miss safely and fall back to PostgreSQL; inspect Redis health before relying on cache metrics |
+| Browser scraper fails in Docker | Chromium executable path and container memory |
 
-```bash
-npx prisma migrate dev
-```
-
-Create and apply migrations.
-
----
-
-```bash
-npx prisma studio
-```
-
-Launch Prisma Studio.
-
----
-
-```bash
-npx prisma generate
-```
-
-Generate Prisma Client.
-
----
-
-## Frontend
-
-```bash
-npm run dev
-```
-
-Starts the Next.js development server.
-
----
-
-# Troubleshooting
-
-## Database Connection Failed
-
-Verify:
-
-* PostgreSQL is running
-* Environment variables are correct
-* Database exists
-
----
-
-## Redis Connection Failed
-
-Verify:
-
-* Redis is running
-* Host and port match the environment configuration
-
-If Redis is unavailable, certain features may operate with reduced performance depending on the current configuration.
-
----
-
-## Migration Errors
-
-Ensure:
-
-* Database credentials are correct
-* Previous migrations completed successfully
-* Prisma Client has been regenerated after schema changes
-
----
-
-## Scraper Returns No Jobs
-
-Possible causes include:
-
-* Provider website changes
-* Network connectivity
-* Rate limiting
-* Invalid environment configuration
-
-Review backend logs and provider summaries for detailed diagnostics.
-
----
-
-## Frontend Cannot Reach Backend
-
-Verify:
-
-* Backend is running
-* API URL is correctly configured in `frontend/.env.local`
-* No firewall or port conflicts exist
-
----
-
-# Development Best Practices
-
-When working on JobScraper:
-
-* Pull the latest changes before starting work.
-* Keep Prisma schema and migrations synchronized.
-* Run the test suite before committing.
-* Verify scraping after modifying provider implementations.
-* Avoid committing `.env` files.
-* Regenerate Prisma Client after schema changes.
-
----
-
-# Next Steps
-
-Once the application is running locally, the following guides are recommended:
-
-* `docker.md`
-* `adding-a-provider.md`
-* `debugging-scrapers.md`
-* `testing.md`
-* `prisma-migrations.md`
-
-These guides cover common development workflows in greater detail.
+All settings are listed in [Configuration](../reference/configuration.md).

@@ -1,422 +1,319 @@
 # REST API Reference
 
-## Overview
-
-This document describes the public REST API exposed by the JobScraper backend.
-
-The API provides endpoints for:
-
-* Searching jobs
-* Retrieving job details
-* Authentication
-* Saved jobs
-* Application health
-* Statistics
-* Administrative operations
-
-All responses are encoded as JSON.
-
----
-
-# Base URL
-
-Local development:
+## Base URL
 
 ```text
 http://localhost:3001/api/v1
 ```
 
-Production deployments may expose a different base URL.
+All request and response bodies use JSON unless stated otherwise.
 
----
+## Response envelopes
 
-# API Versioning
-
-Current version:
-
-```text
-v1
-```
-
-All endpoints are versioned to allow future API evolution without breaking existing clients.
-
----
-
-# Content Type
-
-Requests:
-
-```http
-Content-Type: application/json
-```
-
-Responses:
-
-```http
-Content-Type: application/json
-```
-
----
-
-# Authentication
-
-Most endpoints are public.
-
-Authentication is required only for user-specific operations.
-
-Examples include:
-
-* Saving jobs
-* Viewing saved jobs
-* Account operations
-
-See:
-
-```text
-docs/architecture/authentication.md
-```
-
----
-
-# Pagination
-
-Collection endpoints return paginated results.
-
-Typical parameters:
-
-| Parameter | Type    | Description    |
-| --------- | ------- | -------------- |
-| page      | integer | Current page   |
-| limit     | integer | Items per page |
-
-Typical response:
-
-```json
-{
-  "data": [],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 1420,
-    "totalPages": 71
-  }
-}
-```
-
----
-
-# Sorting
-
-Supported sort options depend on the endpoint.
-
-Typical examples:
-
-| Value  | Description      |
-| ------ | ---------------- |
-| newest | Most recent jobs |
-| oldest | Oldest jobs      |
-
----
-
-# Filtering
-
-Job search supports optional filtering.
-
-Examples include:
-
-* Source
-* Location
-* Employment Type
-* Keywords
-
-Multiple filters may be combined within a single request.
-
----
-
-# Error Format
-
-Errors follow a consistent JSON structure.
-
-Example:
-
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Resource not found"
-  }
-}
-```
-
----
-
-# HTTP Status Codes
-
-| Code | Meaning               |
-| ---- | --------------------- |
-| 200  | Success               |
-| 201  | Created               |
-| 400  | Invalid request       |
-| 401  | Unauthorized          |
-| 403  | Forbidden             |
-| 404  | Resource not found    |
-| 409  | Conflict              |
-| 500  | Internal server error |
-
----
-
-# Endpoints
-
----
-
-# Health
-
-## GET /health
-
-Returns application health information.
-
-### Authentication
-
-Not required.
-
-### Response
-
-```json
-{
-  "status": "healthy"
-}
-```
-
----
-
-# Jobs
-
-## GET /jobs
-
-Returns a paginated collection of jobs.
-
-### Authentication
-
-Not required.
-
-### Query Parameters
-
-| Parameter | Required | Description      |
-| --------- | -------- | ---------------- |
-| page      | No       | Page number      |
-| limit     | No       | Results per page |
-| search    | No       | Search keyword   |
-| source    | No       | Job provider     |
-| location  | No       | Job location     |
-| type      | No       | Employment type  |
-| sort      | No       | Sort order       |
-
-### Example
-
-```http
-GET /api/v1/jobs?page=1&limit=20
-```
-
-### Successful Response
-
-```json
-{
-  "data": [
-    {
-      "id": "...",
-      "company": "Example",
-      "position": "Backend Engineer",
-      "location": "Remote",
-      "source": "RemoteOK"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 412
-  }
-}
-```
-
----
-
-## GET /jobs/:id
-
-Returns a single job.
-
-### Authentication
-
-Not required.
-
-### Path Parameters
-
-| Parameter | Description    |
-| --------- | -------------- |
-| id        | Job identifier |
-
-### Example
-
-```http
-GET /api/v1/jobs/123
-```
-
----
-
-# Saved Jobs
-
-## GET /saved-jobs
-
-Returns jobs saved by the authenticated user.
-
-### Authentication
-
-Required.
-
----
-
-## POST /saved-jobs
-
-Saves a job.
-
-### Authentication
-
-Required.
-
-### Request
-
-```json
-{
-  "jobId": "..."
-}
-```
-
----
-
-## DELETE /saved-jobs/:id
-
-Removes a saved job.
-
-### Authentication
-
-Required.
-
----
-
-# Authentication
-
-## POST /auth/login
-
-Authenticates a user.
-
-### Authentication
-
-Not required.
-
----
-
-## POST /auth/logout
-
-Ends the current session.
-
-### Authentication
-
-Required.
-
----
-
-## GET /auth/session
-
-Returns the current authentication session.
-
-### Authentication
-
-Required.
-
----
-
-# Statistics
-
-## GET /stats
-
-Returns application statistics.
-
-Examples include:
-
-* Total jobs
-* Provider distribution
-* Scraping statistics
-
-Authentication requirements depend on application configuration.
-
----
-
-# Administration
-
-Administrative endpoints are intended for maintenance and operational tasks.
-
-Authentication is required.
-
-Refer to the backend implementation for the complete list of available operations.
-
----
-
-# Response Conventions
-
-Successful responses:
+Successful responses use:
 
 ```json
 {
   "success": true,
-  "data": {}
+  "data": {},
+  "meta": {
+    "timestamp": "2026-07-25T12:00:00.000Z"
+  }
 }
 ```
 
-Error responses:
+`meta` is included only by endpoints that add metadata.
+
+Errors use a string message:
 
 ```json
 {
   "success": false,
-  "error": {}
+  "error": "Job not found"
 }
 ```
 
-Maintaining a consistent response format simplifies frontend integration.
+## Authentication
 
----
+Protected endpoints expect the backend token returned by `POST /auth/login`:
 
-# Rate Limiting
+```http
+Authorization: Bearer <backend-jwt>
+```
 
-The current implementation does not enforce API rate limiting.
+The frontend stores this token inside its NextAuth JWT session. NextAuth session and logout routes belong to the Next.js application and are not Express API endpoints.
 
-If rate limiting is introduced in future versions, this document will be updated accordingly.
+## Health
 
----
+### `GET /health`
 
-# CORS
+Authentication: not required.
 
-Cross-Origin Resource Sharing (CORS) is configured within the backend.
+The endpoint is also available without the `/api/v1` prefix at `/health`.
 
-Frontend requests should originate from approved origins.
+```json
+{
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "timestamp": "2026-07-25T12:00:00.000Z",
+    "uptime": 3600,
+    "database": {
+      "status": "connected"
+    },
+    "cache": {
+      "status": "connected"
+    }
+  }
+}
+```
 
-See backend configuration for implementation details.
+Related component checks:
 
----
+| Method | Path | Authentication |
+| --- | --- | --- |
+| `GET` | `/health/db` | None |
+| `GET` | `/health/redis` | None |
 
-# API Stability
+## Jobs
 
-Public endpoints are considered part of the project's API contract.
+### `GET /jobs`
 
-Breaking changes should only occur through a new API version.
+Authentication: not required.
 
----
+| Parameter | Type | Default | Description |
+| --- | --- | --- | --- |
+| `page` | integer | `1` | Page number. |
+| `limit` | integer | `20` | Results per page. |
+| `search` | string | — | Case-insensitive match against position, company, location, or description. |
+| `company` | string | — | Case-insensitive company filter. |
+| `location` | string | — | Case-insensitive location filter. |
+| `type` | enum | — | `FULL_TIME`, `PART_TIME`, `CONTRACT`, or `INTERNSHIP`. `ALL` disables the filter. |
+| `source` | string | — | Exact source name. |
+| `sortBy` | enum | `recent` | `recent`, `oldest`, or `salary`. |
 
-# Related Documentation
+Example:
 
-Additional information:
+```http
+GET /api/v1/jobs?page=1&limit=20&search=typescript&sortBy=recent
+```
 
-* Architecture Overview
-* Authentication Architecture
-* Search System
-* Local Development Guide
-* Environment Variables Reference
-* Database Schema Reference
+```json
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": "job-uuid",
+        "company": "Example",
+        "position": "Backend Engineer",
+        "location": "Remote",
+        "source": "RemoteOK"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "totalPages": 1
+    }
+  },
+  "meta": {
+    "timestamp": "2026-07-25T12:00:00.000Z"
+  }
+}
+```
+
+### `GET /jobs/search`
+
+Authentication: not required.
+
+| Parameter | Required | Description |
+| --- | --- | --- |
+| `q` | Yes | Search term. |
+| `page` | No | Page number; defaults to `1`. |
+| `limit` | No | Results per page; defaults to `20`. |
+
+This route is a convenience search endpoint. The main `/jobs` endpoint also accepts the broader filter set through `search`.
+
+### `GET /jobs/:id`
+
+Authentication: not required.
+
+`id` is the Job UUID. A missing job returns `404`.
+
+## Authentication
+
+### `POST /auth/register`
+
+Authentication: not required.
+
+```json
+{
+  "name": "Ayesha Islam",
+  "email": "ayesha@example.com",
+  "password": "at-least-eight-characters"
+}
+```
+
+Returns `201` with public user fields. Registration does not return a token.
+
+Possible errors:
+
+- `400` for missing/invalid fields;
+- `409` when the email already exists.
+
+### `POST /auth/login`
+
+Authentication: not required.
+
+```json
+{
+  "email": "ayesha@example.com",
+  "password": "the-user-password"
+}
+```
+
+```json
+{
+  "success": true,
+  "token": "backend-jwt",
+  "data": {
+    "id": 1,
+    "email": "ayesha@example.com",
+    "name": "Ayesha Islam"
+  }
+}
+```
+
+The backend JWT expires after 24 hours.
+
+### `GET /auth/me`
+
+Authentication: required.
+
+Returns the public profile for the authenticated backend user.
+
+## Saved jobs
+
+All saved-job endpoints require a valid backend JWT.
+
+### `POST /saved-jobs`
+
+```json
+{
+  "jobId": "job-uuid"
+}
+```
+
+Returns `201` with the SavedJob record and its related Job.
+
+Possible errors:
+
+- `404` when the Job does not exist;
+- `409` when the user already saved the Job.
+
+### `GET /saved-jobs`
+
+Returns SavedJob records with their related Job, ordered by `savedAt` descending.
+
+### `GET /saved-jobs/check/:jobId`
+
+```json
+{
+  "success": true,
+  "data": {
+    "saved": true
+  }
+}
+```
+
+### `DELETE /saved-jobs/:jobId`
+
+`jobId` is the Job UUID, not the SavedJob integer ID.
+
+```json
+{
+  "success": true,
+  "data": {
+    "removed": true
+  }
+}
+```
+
+## Statistics
+
+### `GET /stats`
+
+Authentication: not required.
+
+Returns:
+
+- total active jobs;
+- jobs added since the API server's local start-of-day boundary;
+- counts by source;
+- counts by employment type.
+
+`GET /stats/sources` currently returns the same payload.
+
+## Administration
+
+All `/admin/*` endpoints require:
+
+1. a valid backend bearer token; and
+2. a token email listed in `ADMIN_EMAILS`.
+
+Unauthenticated requests return `401`. Authenticated users outside the allowlist return `403`.
+
+### `POST /admin/scrape`
+
+Runs all configured scrapers:
+
+```json
+{}
+```
+
+Runs one configured source:
+
+```json
+{
+  "source": "RemoteOK"
+}
+```
+
+The scrape currently runs inside the HTTP request process. The endpoint can consume significant time and browser resources and should not be exposed publicly without additional rate and resource controls.
+
+### `GET /admin/scrape`
+
+Returns `405 Method Not Allowed` for an authorized administrator. Use `POST`.
+
+### `GET /admin/scrape/logs`
+
+Supports `page` and `limit`; returns persisted ScrapeLog records newest first.
+
+### `GET /admin/scrape/stats`
+
+Returns scrape statistics calculated from logs created during the previous 24 hours.
+
+### `DELETE /admin/cache`
+
+Invalidates job-list, job-detail, and statistics cache keys.
+
+### `GET /admin/cache/stats`
+
+Returns Redis keyspace hits, misses, hit rate, and the current key count.
+
+## Current API limitations
+
+- No API rate limiting is implemented.
+- Pagination parameters are parsed but not yet bounded to safe maximum values.
+- Error messages are strings rather than structured error objects/codes.
+- Administrative scraping runs synchronously in the API process.
+- API versioning is expressed in the URL, but no compatibility policy is defined yet.
+
+## Related documentation
+
+- [Authentication architecture](../architecture/authentication.md)
+- [Configuration](configuration.md)
+- [Database](database.md)
+- [Search and caching](../architecture/search-and-caching.md)

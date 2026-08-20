@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import { env } from '../config';
 
 type AuthTokenPayload = {
     id?: number;
@@ -29,10 +30,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     }
 
     const token = authorization.slice('Bearer '.length).trim();
-    const secret = process.env.JWT_SECRET || 'your_secret_key';
-
     try {
-        const payload = jwt.verify(token, secret) as AuthTokenPayload;
+        const payload = jwt.verify(token, env.JWT_SECRET) as AuthTokenPayload;
         const userId = payload.id ?? payload.userId;
 
         if (!userId || Number.isNaN(Number(userId))) {
@@ -54,4 +53,21 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
             error: 'Unauthorized',
         });
     }
+}
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+    const configuredAdmins = (process.env.ADMIN_EMAILS ?? env.ADMIN_EMAILS ?? '')
+        .split(',')
+        .map(email => email.trim().toLowerCase())
+        .filter(Boolean);
+    const email = req.user?.email?.trim().toLowerCase();
+
+    if (!email || !configuredAdmins.includes(email)) {
+        return res.status(403).json({
+            success: false,
+            error: 'Forbidden',
+        });
+    }
+
+    return next();
 }

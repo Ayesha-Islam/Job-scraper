@@ -19,6 +19,8 @@ export interface Env {
   DB_POOL_IDLE_TIMEOUT_MS?: string;
   DB_POOL_CONNECTION_TIMEOUT_MS?: string;
   DB_SSL?: string;
+  JWT_SECRET: string;
+  ADMIN_EMAILS?: string;
 }
 
 const missing = (key: string): never => {
@@ -44,6 +46,8 @@ export const env: Env = {
   DB_POOL_IDLE_TIMEOUT_MS: process.env.DB_POOL_IDLE_TIMEOUT_MS,
   DB_POOL_CONNECTION_TIMEOUT_MS: process.env.DB_POOL_CONNECTION_TIMEOUT_MS,
   DB_SSL: process.env.DB_SSL,
+  JWT_SECRET: process.env.JWT_SECRET ?? missing('JWT_SECRET'),
+  ADMIN_EMAILS: process.env.ADMIN_EMAILS,
 };
 
 const parseNumber = (

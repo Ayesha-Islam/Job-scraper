@@ -67,7 +67,7 @@ export default function StatsPage() {
               Remote Job Market Statistics
             </h1>
             <p className="text-muted-foreground text-base sm:text-lg">
-              Real-time insights into the remote job market. Data updated every 30 minutes.
+              Insights into the remote job market from the latest completed daily scrape.
             </p>
           </div>
         </div>
@@ -162,7 +162,7 @@ export default function StatsPage() {
                   How often is data updated?
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Our scrapers run every 30 minutes to bring you the latest job opportunities
+                  Our scrapers run once daily to collect the latest job opportunities
                   from top remote job boards including LinkedIn, Remotive, and WeWorkRemotely.
                 </p>
               </div>

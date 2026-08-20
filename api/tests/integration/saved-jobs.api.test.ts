@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestContainer } from '../helpers/create-test-container';
 import { createTestApp } from '../helpers/create-test-app';
+import { env } from '../../src/config';
 
 vi.mock('../../src/lib/prisma', () => {
   const db = {
@@ -27,7 +28,7 @@ const mockedDb = db as any;
 function createToken(userId = 7) {
   return jwt.sign(
     { id: userId, email: 'saved@example.com' },
-    process.env.JWT_SECRET || 'your_secret_key'
+    env.JWT_SECRET
   );
 }
 
